@@ -87,13 +87,17 @@ public struct PickleballTrainingGenieClient {
     }
 
     public func recommendations(skillLevel: String, focus: String) async throws -> [Recommendation] {
-        var components = urlComponents(path: "api/recommendations")
+        var components = try urlComponents(path: "api/recommendations")
         components.queryItems = [
             URLQueryItem(name: "skillLevel", value: skillLevel),
             URLQueryItem(name: "focus", value: focus),
         ]
 
-        let response: RecommendationsResponse = try await request(components.url!, method: "GET")
+        guard let url = components.url else {
+            throw PickleballTrainingGenieError.invalidURL
+        }
+
+        let response: RecommendationsResponse = try await request(url, method: "GET")
         return response.recommendations
     }
 
@@ -106,8 +110,12 @@ public struct PickleballTrainingGenieClient {
         return response.sessions
     }
 
-    func urlComponents(path: String) -> URLComponents {
-        URLComponents(url: url(path: path), resolvingAgainstBaseURL: false)!
+    func urlComponents(path: String) throws -> URLComponents {
+        guard let components = URLComponents(url: url(path: path), resolvingAgainstBaseURL: false) else {
+            throw PickleballTrainingGenieError.invalidURL
+        }
+
+        return components
     }
 
     private func url(path: String) -> URL {
@@ -127,7 +135,9 @@ public struct PickleballTrainingGenieClient {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
         let (data, response) = try await session.data(for: request)
-        let httpResponse = response as! HTTPURLResponse
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw PickleballTrainingGenieError.invalidResponse(statusCode: 0)
+        }
 
         guard 200..<300 ~= httpResponse.statusCode else {
             throw PickleballTrainingGenieError.invalidResponse(statusCode: httpResponse.statusCode)
@@ -148,7 +158,9 @@ public struct PickleballTrainingGenieClient {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let (data, response) = try await session.data(for: request)
-        let httpResponse = response as! HTTPURLResponse
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw PickleballTrainingGenieError.invalidResponse(statusCode: 0)
+        }
 
         guard 200..<300 ~= httpResponse.statusCode else {
             throw PickleballTrainingGenieError.invalidResponse(statusCode: httpResponse.statusCode)
@@ -159,5 +171,6 @@ public struct PickleballTrainingGenieClient {
 }
 
 public enum PickleballTrainingGenieError: Error, Equatable {
+    case invalidURL
     case invalidResponse(statusCode: Int)
 }

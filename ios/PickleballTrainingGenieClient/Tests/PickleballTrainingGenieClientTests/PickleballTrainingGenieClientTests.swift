@@ -5,7 +5,7 @@ import Testing
 @Test func recommendationsUsesExpectedQueryItems() async throws {
     let client = PickleballTrainingGenieClient(baseURL: URL(string: "https://example.com/")!)
 
-    let components = client.urlComponents(path: "api/recommendations")
+    let components = try client.urlComponents(path: "api/recommendations")
 
     #expect(components.url?.absoluteString == "https://example.com/api/recommendations")
 }

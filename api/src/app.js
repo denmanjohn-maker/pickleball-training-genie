@@ -6,6 +6,7 @@ const { buildRecommendations } = require('./recommendations');
 function createApp() {
   const app = express();
   const trainingSessions = [];
+  let nextSessionNumber = 1;
 
   app.use(express.json());
 
@@ -46,7 +47,7 @@ function createApp() {
     }
 
     const session = {
-      id: `session-${trainingSessions.length + 1}`,
+      id: `session-${nextSessionNumber++}`,
       playerName: playerName || 'Player',
       skillLevel,
       focus,
