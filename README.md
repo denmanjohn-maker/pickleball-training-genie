@@ -33,7 +33,7 @@ Example training session payload:
 ## Running the API
 
 ```bash
-cd /tmp/workspace/denmanjohn-maker/pickleball-training-genie/api
+cd api
 npm install
 npm test
 npm start
@@ -44,7 +44,7 @@ The API starts on `http://localhost:3000`.
 ## Building the Swift client
 
 ```bash
-cd /tmp/workspace/denmanjohn-maker/pickleball-training-genie/ios/PickleballTrainingGenieClient
+cd ios/PickleballTrainingGenieClient
 swift test
 ```
 
