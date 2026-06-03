@@ -58,9 +58,13 @@ test('POST /api/training-sessions tracks a session and returns follow-up recomme
     });
 
     const createdSession = await createResponse.json();
+    const includesCompletedDrillRecommendation = createdSession.recommendations.some(
+      ({ drill }) => drill.id === 'speed-up-counter'
+    );
+
     assert.equal(createResponse.status, 201);
     assert.equal(createdSession.playerName, 'Alex');
-    assert.equal(createdSession.recommendations.some(({ drill }) => drill.id === 'speed-up-counter'), false);
+    assert.equal(includesCompletedDrillRecommendation, false);
 
     const listResponse = await fetch(`${baseUrl}/api/training-sessions`);
     const listedSessions = await listResponse.json();
