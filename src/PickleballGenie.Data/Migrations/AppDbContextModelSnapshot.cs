@@ -170,8 +170,7 @@ namespace PickleballGenie.Data.Migrations
                         .HasColumnType("text");
 
                     b.Property<int>("EstimatedDurationMinutes")
-                        .HasColumnType("integer")
-                        .HasDefaultValue(10);
+                        .HasColumnType("integer");
 
                     b.Property<string>("SourceUrl")
                         .IsRequired()
@@ -241,14 +240,14 @@ namespace PickleballGenie.Data.Migrations
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("boolean");
 
+                    b.Property<int?>("PreferredSessionDurationMinutes")
+                        .HasColumnType("integer");
+
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("text");
 
                     b.Property<decimal>("TargetDUPR")
                         .HasColumnType("numeric");
-
-                    b.Property<int?>("PreferredSessionDurationMinutes")
-                        .HasColumnType("integer");
 
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("boolean");
