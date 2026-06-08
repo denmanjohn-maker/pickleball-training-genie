@@ -103,7 +103,7 @@ The system prompt instructs Claude to act as an expert pickleball coach and retu
 - The numbered drill list
 - The exact JSON schema Claude must conform to
 
-To modify the workout format, update `BuildWorkoutPrompt` in `WorkoutsController.cs` and the corresponding response DTOs (`WorkoutDrillItem`, `WorkoutPlanResponse`).
+To modify the workout format, update the prompt built inside `GenerateWithClaude` in `WorkoutsController.cs` and the corresponding response DTOs (`WorkoutDrillItem`, `WorkoutPlanResponse`).
 
 ### Configuration
 - `ANTHROPIC_API_KEY` env var (or `AnthropicApiKey` in `appsettings.json`)

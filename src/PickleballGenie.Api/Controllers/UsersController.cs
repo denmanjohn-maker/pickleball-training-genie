@@ -29,7 +29,8 @@ public class UsersController : ControllerBase
             UserName = request.Email,
             Email = request.Email,
             CurrentDUPR = request.CurrentDUPR,
-            TargetDUPR = request.TargetDUPR
+            TargetDUPR = request.TargetDUPR,
+            PreferredSessionDurationMinutes = request.PreferredSessionDurationMinutes
         };
 
         var result = await _userManager.CreateAsync(user, request.Password);
@@ -93,6 +94,7 @@ public class RegisterRequest
     public string Password { get; set; } = string.Empty;
     public decimal CurrentDUPR { get; set; }
     public decimal TargetDUPR { get; set; }
+    public int? PreferredSessionDurationMinutes { get; set; }
 }
 
 public class LoginRequest

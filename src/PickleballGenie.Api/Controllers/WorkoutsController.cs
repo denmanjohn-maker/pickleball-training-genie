@@ -43,9 +43,14 @@ public class WorkoutsController : ControllerBase
         if (user == null)
             return NotFound("User not found.");
 
+        if (user.TargetDUPR < user.CurrentDUPR)
+            return BadRequest("TargetDUPR must be greater than or equal to CurrentDUPR.");
+
         var durationMinutes = request.DurationMinutes
             ?? user.PreferredSessionDurationMinutes
             ?? 30;
+
+        durationMinutes = Math.Clamp(durationMinutes, 5, 180);
 
         var drills = await _context.Drills
             .Where(d => d.TargetDUPRLevel >= user.CurrentDUPR && d.TargetDUPRLevel <= user.TargetDUPR)
@@ -57,15 +62,27 @@ public class WorkoutsController : ControllerBase
         if (!drills.Any())
             return BadRequest("No drills found for your DUPR range. Please run the scraper to populate the drill database.");
 
-        var apiKey = _configuration["AnthropicApiKey"]
-            ?? Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY")
-            ?? string.Empty;
+        var configKey = _configuration["AnthropicApiKey"];
+        var apiKey = !string.IsNullOrWhiteSpace(configKey)
+            ? configKey
+            : Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
 
-        if (string.IsNullOrEmpty(apiKey))
+        if (string.IsNullOrWhiteSpace(apiKey))
             return StatusCode(503, "Workout generation is not configured. Please set ANTHROPIC_API_KEY.");
 
-        var workoutPlan = await GenerateWithClaude(apiKey, user, drills, durationMinutes);
-        return Ok(workoutPlan);
+        try
+        {
+            var workoutPlan = await GenerateWithClaude(apiKey, user, drills, durationMinutes);
+            return Ok(workoutPlan);
+        }
+        catch (HttpRequestException ex)
+        {
+            return StatusCode(502, new { error = "Failed to reach the AI service.", details = ex.Message });
+        }
+        catch (WorkoutGenerationException ex)
+        {
+            return StatusCode(502, new { error = "AI service returned an error.", details = ex.Message });
+        }
     }
 
     private async Task<object> GenerateWithClaude(string apiKey, User user, List<Drill> drills, int durationMinutes)
@@ -122,7 +139,7 @@ public class WorkoutsController : ControllerBase
         var responseJson = await response.Content.ReadAsStringAsync();
 
         if (!response.IsSuccessStatusCode)
-            return new { error = "Failed to generate workout.", details = responseJson };
+            throw new WorkoutGenerationException(responseJson);
 
         using var doc = JsonDocument.Parse(responseJson);
         var textContent = doc.RootElement
@@ -149,6 +166,11 @@ public class WorkoutsController : ControllerBase
         <= 4.0m => "Advanced",
         _ => "Professional"
     };
+}
+
+public class WorkoutGenerationException : Exception
+{
+    public WorkoutGenerationException(string message) : base(message) { }
 }
 
 public class GenerateWorkoutRequest

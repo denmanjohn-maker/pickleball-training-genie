@@ -71,12 +71,18 @@ class Program
 
         Console.WriteLine($"Total drills collected: {allDrills.Count}. Upserting to database...");
 
+        // Load existing titles once to avoid an N+1 query per drill
+        var existingTitles = await dbContext.Drills
+            .Select(d => d.Title)
+            .ToHashSetAsync();
+
         int added = 0;
         foreach (var drill in allDrills)
         {
-            if (!await dbContext.Drills.AnyAsync(d => d.Title == drill.Title))
+            if (!existingTitles.Contains(drill.Title))
             {
                 dbContext.Drills.Add(drill);
+                existingTitles.Add(drill.Title);
                 Console.WriteLine($"  Added: [{drill.Category}] {drill.Title} (DUPR {drill.TargetDUPRLevel}, ~{drill.EstimatedDurationMinutes}min)");
                 added++;
             }
@@ -89,8 +95,11 @@ class Program
     static async Task<List<Drill>> ScrapeSiteAsync(HttpClient httpClient, string url, string siteName)
     {
         var drills = new List<Drill>();
-        var web = new HtmlWeb();
-        var doc = await web.LoadFromWebAsync(url);
+
+        // Use the configured HttpClient (with User-Agent and timeout) to fetch HTML
+        var html = await httpClient.GetStringAsync(url);
+        var doc = new HtmlDocument();
+        doc.LoadHtml(html);
 
         // Try multiple common blog/CMS patterns for article listings
         var articleNodes = doc.DocumentNode.SelectNodes(
@@ -108,9 +117,9 @@ class Program
                 if (string.IsNullOrWhiteSpace(title) || title.Length < 5) continue;
 
                 var href = link.GetAttributeValue("href", "");
-                if (string.IsNullOrEmpty(href)) href = url;
+                var sourceUrl = string.IsNullOrEmpty(href) ? url : ResolveUrl(href, url);
 
-                var drill = BuildDrill(title, "", siteName, href);
+                var drill = BuildDrill(title, "", siteName, sourceUrl);
                 drills.Add(drill);
             }
 
@@ -131,14 +140,22 @@ class Program
                 : "";
 
             var linkNode = titleNode.Name == "a" ? titleNode : article.SelectSingleNode(".//a[@href]");
-            var sourceUrl = linkNode?.GetAttributeValue("href", url) ?? url;
-            if (!sourceUrl.StartsWith("http")) sourceUrl = url;
+            var rawHref = linkNode?.GetAttributeValue("href", "") ?? "";
+            var sourceUrl = string.IsNullOrEmpty(rawHref) ? url : ResolveUrl(rawHref, url);
 
             var drill = BuildDrill(title, description, siteName, sourceUrl);
             drills.Add(drill);
         }
 
         return drills;
+    }
+
+    // Resolves a potentially relative href against the listing page URL.
+    static string ResolveUrl(string href, string baseUrl)
+    {
+        if (href.StartsWith("http://") || href.StartsWith("https://"))
+            return href;
+        return new Uri(new Uri(baseUrl), href).AbsoluteUri;
     }
 
     static Drill BuildDrill(string title, string description, string siteName, string sourceUrl)
