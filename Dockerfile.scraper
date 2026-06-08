@@ -1,0 +1,18 @@
+FROM mcr.microsoft.com/dotnet/sdk:10.0-preview AS build
+WORKDIR /src
+
+COPY src/PickleballGenie.Scraper/PickleballGenie.Scraper.csproj PickleballGenie.Scraper/
+COPY src/PickleballGenie.Data/PickleballGenie.Data.csproj PickleballGenie.Data/
+COPY src/PickleballGenie.Models/PickleballGenie.Models.csproj PickleballGenie.Models/
+
+RUN dotnet restore PickleballGenie.Scraper/PickleballGenie.Scraper.csproj
+
+COPY src/ .
+WORKDIR /src/PickleballGenie.Scraper
+RUN dotnet publish -c Release -o /app/publish
+
+FROM mcr.microsoft.com/dotnet/runtime:10.0-preview AS runtime
+WORKDIR /app
+COPY --from=build /app/publish .
+
+ENTRYPOINT ["dotnet", "PickleballGenie.Scraper.dll"]
