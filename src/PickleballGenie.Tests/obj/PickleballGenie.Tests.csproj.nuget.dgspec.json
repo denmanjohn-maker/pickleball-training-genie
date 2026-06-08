@@ -1,20 +1,20 @@
 {
   "format": 1,
   "restore": {
-    "/tmp/workspace/denmanjohn-maker/pickleball-training-genie/src/PickleballGenie.Tests/PickleballGenie.Tests.csproj": {}
+    "/Users/johndenman/Repos/pickleball-training-genie/src/PickleballGenie.Tests/PickleballGenie.Tests.csproj": {}
   },
   "projects": {
-    "/tmp/workspace/denmanjohn-maker/pickleball-training-genie/src/PickleballGenie.Api/PickleballGenie.Api.csproj": {
+    "/Users/johndenman/Repos/pickleball-training-genie/src/PickleballGenie.Api/PickleballGenie.Api.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/tmp/workspace/denmanjohn-maker/pickleball-training-genie/src/PickleballGenie.Api/PickleballGenie.Api.csproj",
+        "projectUniqueName": "/Users/johndenman/Repos/pickleball-training-genie/src/PickleballGenie.Api/PickleballGenie.Api.csproj",
         "projectName": "PickleballGenie.Api",
-        "projectPath": "/tmp/workspace/denmanjohn-maker/pickleball-training-genie/src/PickleballGenie.Api/PickleballGenie.Api.csproj",
-        "packagesPath": "/home/runner/.nuget/packages/",
-        "outputPath": "/tmp/workspace/denmanjohn-maker/pickleball-training-genie/src/PickleballGenie.Api/obj/",
+        "projectPath": "/Users/johndenman/Repos/pickleball-training-genie/src/PickleballGenie.Api/PickleballGenie.Api.csproj",
+        "packagesPath": "/Users/johndenman/.nuget/packages/",
+        "outputPath": "/Users/johndenman/Repos/pickleball-training-genie/src/PickleballGenie.Api/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "/home/runner/.nuget/NuGet/NuGet.Config"
+          "/Users/johndenman/.nuget/NuGet/NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net10.0"
@@ -24,14 +24,13 @@
         },
         "frameworks": {
           "net10.0": {
-            "framework": "net10.0",
             "targetAlias": "net10.0",
             "projectReferences": {
-              "/tmp/workspace/denmanjohn-maker/pickleball-training-genie/src/PickleballGenie.Data/PickleballGenie.Data.csproj": {
-                "projectPath": "/tmp/workspace/denmanjohn-maker/pickleball-training-genie/src/PickleballGenie.Data/PickleballGenie.Data.csproj"
+              "/Users/johndenman/Repos/pickleball-training-genie/src/PickleballGenie.Data/PickleballGenie.Data.csproj": {
+                "projectPath": "/Users/johndenman/Repos/pickleball-training-genie/src/PickleballGenie.Data/PickleballGenie.Data.csproj"
               },
-              "/tmp/workspace/denmanjohn-maker/pickleball-training-genie/src/PickleballGenie.Models/PickleballGenie.Models.csproj": {
-                "projectPath": "/tmp/workspace/denmanjohn-maker/pickleball-training-genie/src/PickleballGenie.Models/PickleballGenie.Models.csproj"
+              "/Users/johndenman/Repos/pickleball-training-genie/src/PickleballGenie.Models/PickleballGenie.Models.csproj": {
+                "projectPath": "/Users/johndenman/Repos/pickleball-training-genie/src/PickleballGenie.Models/PickleballGenie.Models.csproj"
               }
             }
           }
@@ -46,11 +45,10 @@
           "auditLevel": "low",
           "auditMode": "all"
         },
-        "SdkAnalysisLevel": "10.0.300"
+        "SdkAnalysisLevel": "10.0.200"
       },
       "frameworks": {
         "net10.0": {
-          "framework": "net10.0",
           "targetAlias": "net10.0",
           "dependencies": {
             "Microsoft.AspNetCore.Authentication.JwtBearer": {
@@ -91,7 +89,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/10.0.300/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/10.0.201/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.AspNetCore": "(,10.0.32767]",
             "Microsoft.AspNetCore.Antiforgery": "(,10.0.32767]",
@@ -509,17 +507,17 @@
         }
       }
     },
-    "/tmp/workspace/denmanjohn-maker/pickleball-training-genie/src/PickleballGenie.Data/PickleballGenie.Data.csproj": {
+    "/Users/johndenman/Repos/pickleball-training-genie/src/PickleballGenie.Data/PickleballGenie.Data.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/tmp/workspace/denmanjohn-maker/pickleball-training-genie/src/PickleballGenie.Data/PickleballGenie.Data.csproj",
+        "projectUniqueName": "/Users/johndenman/Repos/pickleball-training-genie/src/PickleballGenie.Data/PickleballGenie.Data.csproj",
         "projectName": "PickleballGenie.Data",
-        "projectPath": "/tmp/workspace/denmanjohn-maker/pickleball-training-genie/src/PickleballGenie.Data/PickleballGenie.Data.csproj",
-        "packagesPath": "/home/runner/.nuget/packages/",
-        "outputPath": "/tmp/workspace/denmanjohn-maker/pickleball-training-genie/src/PickleballGenie.Data/obj/",
+        "projectPath": "/Users/johndenman/Repos/pickleball-training-genie/src/PickleballGenie.Data/PickleballGenie.Data.csproj",
+        "packagesPath": "/Users/johndenman/.nuget/packages/",
+        "outputPath": "/Users/johndenman/Repos/pickleball-training-genie/src/PickleballGenie.Data/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "/home/runner/.nuget/NuGet/NuGet.Config"
+          "/Users/johndenman/.nuget/NuGet/NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net10.0"
@@ -529,11 +527,10 @@
         },
         "frameworks": {
           "net10.0": {
-            "framework": "net10.0",
             "targetAlias": "net10.0",
             "projectReferences": {
-              "/tmp/workspace/denmanjohn-maker/pickleball-training-genie/src/PickleballGenie.Models/PickleballGenie.Models.csproj": {
-                "projectPath": "/tmp/workspace/denmanjohn-maker/pickleball-training-genie/src/PickleballGenie.Models/PickleballGenie.Models.csproj"
+              "/Users/johndenman/Repos/pickleball-training-genie/src/PickleballGenie.Models/PickleballGenie.Models.csproj": {
+                "projectPath": "/Users/johndenman/Repos/pickleball-training-genie/src/PickleballGenie.Models/PickleballGenie.Models.csproj"
               }
             }
           }
@@ -548,11 +545,10 @@
           "auditLevel": "low",
           "auditMode": "all"
         },
-        "SdkAnalysisLevel": "10.0.300"
+        "SdkAnalysisLevel": "10.0.200"
       },
       "frameworks": {
         "net10.0": {
-          "framework": "net10.0",
           "targetAlias": "net10.0",
           "dependencies": {
             "Microsoft.AspNetCore.Identity.EntityFrameworkCore": {
@@ -580,7 +576,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/10.0.300/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/10.0.201/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.CSharp": "(,4.7.32767]",
             "Microsoft.VisualBasic": "(,10.4.32767]",
@@ -858,17 +854,17 @@
         }
       }
     },
-    "/tmp/workspace/denmanjohn-maker/pickleball-training-genie/src/PickleballGenie.Models/PickleballGenie.Models.csproj": {
+    "/Users/johndenman/Repos/pickleball-training-genie/src/PickleballGenie.Models/PickleballGenie.Models.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/tmp/workspace/denmanjohn-maker/pickleball-training-genie/src/PickleballGenie.Models/PickleballGenie.Models.csproj",
+        "projectUniqueName": "/Users/johndenman/Repos/pickleball-training-genie/src/PickleballGenie.Models/PickleballGenie.Models.csproj",
         "projectName": "PickleballGenie.Models",
-        "projectPath": "/tmp/workspace/denmanjohn-maker/pickleball-training-genie/src/PickleballGenie.Models/PickleballGenie.Models.csproj",
-        "packagesPath": "/home/runner/.nuget/packages/",
-        "outputPath": "/tmp/workspace/denmanjohn-maker/pickleball-training-genie/src/PickleballGenie.Models/obj/",
+        "projectPath": "/Users/johndenman/Repos/pickleball-training-genie/src/PickleballGenie.Models/PickleballGenie.Models.csproj",
+        "packagesPath": "/Users/johndenman/.nuget/packages/",
+        "outputPath": "/Users/johndenman/Repos/pickleball-training-genie/src/PickleballGenie.Models/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "/home/runner/.nuget/NuGet/NuGet.Config"
+          "/Users/johndenman/.nuget/NuGet/NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net10.0"
@@ -878,7 +874,6 @@
         },
         "frameworks": {
           "net10.0": {
-            "framework": "net10.0",
             "targetAlias": "net10.0",
             "projectReferences": {}
           }
@@ -893,11 +888,10 @@
           "auditLevel": "low",
           "auditMode": "all"
         },
-        "SdkAnalysisLevel": "10.0.300"
+        "SdkAnalysisLevel": "10.0.200"
       },
       "frameworks": {
         "net10.0": {
-          "framework": "net10.0",
           "targetAlias": "net10.0",
           "dependencies": {
             "Microsoft.AspNetCore.Identity.EntityFrameworkCore": {
@@ -925,7 +919,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/10.0.300/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/10.0.201/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.CSharp": "(,4.7.32767]",
             "Microsoft.VisualBasic": "(,10.4.32767]",
@@ -1203,17 +1197,17 @@
         }
       }
     },
-    "/tmp/workspace/denmanjohn-maker/pickleball-training-genie/src/PickleballGenie.Tests/PickleballGenie.Tests.csproj": {
+    "/Users/johndenman/Repos/pickleball-training-genie/src/PickleballGenie.Tests/PickleballGenie.Tests.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/tmp/workspace/denmanjohn-maker/pickleball-training-genie/src/PickleballGenie.Tests/PickleballGenie.Tests.csproj",
+        "projectUniqueName": "/Users/johndenman/Repos/pickleball-training-genie/src/PickleballGenie.Tests/PickleballGenie.Tests.csproj",
         "projectName": "PickleballGenie.Tests",
-        "projectPath": "/tmp/workspace/denmanjohn-maker/pickleball-training-genie/src/PickleballGenie.Tests/PickleballGenie.Tests.csproj",
-        "packagesPath": "/home/runner/.nuget/packages/",
-        "outputPath": "/tmp/workspace/denmanjohn-maker/pickleball-training-genie/src/PickleballGenie.Tests/obj/",
+        "projectPath": "/Users/johndenman/Repos/pickleball-training-genie/src/PickleballGenie.Tests/PickleballGenie.Tests.csproj",
+        "packagesPath": "/Users/johndenman/.nuget/packages/",
+        "outputPath": "/Users/johndenman/Repos/pickleball-training-genie/src/PickleballGenie.Tests/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "/home/runner/.nuget/NuGet/NuGet.Config"
+          "/Users/johndenman/.nuget/NuGet/NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net10.0"
@@ -1223,14 +1217,13 @@
         },
         "frameworks": {
           "net10.0": {
-            "framework": "net10.0",
             "targetAlias": "net10.0",
             "projectReferences": {
-              "/tmp/workspace/denmanjohn-maker/pickleball-training-genie/src/PickleballGenie.Api/PickleballGenie.Api.csproj": {
-                "projectPath": "/tmp/workspace/denmanjohn-maker/pickleball-training-genie/src/PickleballGenie.Api/PickleballGenie.Api.csproj"
+              "/Users/johndenman/Repos/pickleball-training-genie/src/PickleballGenie.Api/PickleballGenie.Api.csproj": {
+                "projectPath": "/Users/johndenman/Repos/pickleball-training-genie/src/PickleballGenie.Api/PickleballGenie.Api.csproj"
               },
-              "/tmp/workspace/denmanjohn-maker/pickleball-training-genie/src/PickleballGenie.Data/PickleballGenie.Data.csproj": {
-                "projectPath": "/tmp/workspace/denmanjohn-maker/pickleball-training-genie/src/PickleballGenie.Data/PickleballGenie.Data.csproj"
+              "/Users/johndenman/Repos/pickleball-training-genie/src/PickleballGenie.Data/PickleballGenie.Data.csproj": {
+                "projectPath": "/Users/johndenman/Repos/pickleball-training-genie/src/PickleballGenie.Data/PickleballGenie.Data.csproj"
               }
             }
           }
@@ -1245,11 +1238,10 @@
           "auditLevel": "low",
           "auditMode": "all"
         },
-        "SdkAnalysisLevel": "10.0.300"
+        "SdkAnalysisLevel": "10.0.200"
       },
       "frameworks": {
         "net10.0": {
-          "framework": "net10.0",
           "targetAlias": "net10.0",
           "dependencies": {
             "Microsoft.AspNetCore.Mvc.Testing": {
@@ -1293,7 +1285,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/10.0.300/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/10.0.201/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.CSharp": "(,4.7.32767]",
             "Microsoft.VisualBasic": "(,10.4.32767]",

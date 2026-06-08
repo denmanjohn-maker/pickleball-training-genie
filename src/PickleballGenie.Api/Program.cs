@@ -14,15 +14,15 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 
 if (!string.IsNullOrEmpty(connectionString) && connectionString.StartsWith("postgres://"))
 {
-    // Railway gives ******host:port/db
+    // Railway gives postgres://user:password@host:port/db
     var uri = new Uri(connectionString);
     var userInfo = uri.UserInfo.Split(':');
     var password = userInfo.Length > 1 ? userInfo[1] : "";
-    connectionString = $"Host={uri.Host};Port={uri.Port};Database={uri.LocalPath.TrimStart('/')};Username={userInfo[0]};******;SslMode=Require;TrustServerCertificate=True;";
+    connectionString = $"Host={uri.Host};Port={uri.Port};Database={uri.LocalPath.TrimStart('/')};Username={userInfo[0]};Password={password};SslMode=Require;TrustServerCertificate=True;";
 }
 
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(connectionString ?? "Host=localhost;Port=5432;Database=pickleball_genie;Username=postgres;******"));
+    options.UseNpgsql(connectionString ?? "Host=localhost;Port=5432;Database=pickleball_genie;Username=postgres;Password=postgres"));
 
 builder.Services.AddIdentity<User, IdentityRole<Guid>>()
     .AddEntityFrameworkStores<AppDbContext>()
