@@ -12,6 +12,10 @@
 
 > Note: The README references a Node.js `api/` directory; the actual backend is the .NET solution in `src/`.
 
+## Central Premise
+
+**Every feature in this application must serve one goal: helping pickleball players improve by giving them LLM-generated, level-appropriate drilling workouts.** When making architectural or feature decisions, prioritize level-appropriate drilling over out-of-scope features (e.g., social features or general fitness tracking).
+
 ## Build and test commands
 
 ```bash
@@ -41,6 +45,13 @@ EF Core migrations:
 dotnet ef migrations add <MigrationName> --project src/PickleballGenie.Data --startup-project src/PickleballGenie.Api
 ```
 
+Database seeding:
+
+```bash
+# Seed the Drill Database (Scraper)
+cd src/PickleballGenie.Scraper && dotnet run
+```
+
 ## Architecture
 
 **Dependency chain:** `Models` ← `Data` ← `Api` / `Tests` / `Scraper`
@@ -49,6 +60,8 @@ dotnet ef migrations add <MigrationName> --project src/PickleballGenie.Data --st
 
 **Auth:** JWT bearer tokens issued by `POST /api/Users/login`. Most controller actions are `[Authorize]`; public endpoints are decorated `[AllowAnonymous]`. The token embeds `ClaimTypes.NameIdentifier` (user GUID) and `CurrentDUPR`.
 
+**LLM Workout Generation:** `POST /api/workouts/generate` queries drills matching the user's DUPR range and sends them to Claude (Anthropic API `claude-sonnet-4-6`). The prompt is built inside `GenerateWithClaude` in `WorkoutsController.cs`.
+
 **Recommendation logic:** `GET /api/Drills/recommendations` returns drills where `TargetDUPRLevel` falls within `[user.CurrentDUPR, user.TargetDUPR]`.
 
 **Swift client:** `PickleballTrainingGenieClient` is a stateful class that stores `jwtToken` after a successful `login()` call and attaches it as a `Bearer` header on all `requireAuth: true` requests.
@@ -56,7 +69,7 @@ dotnet ef migrations add <MigrationName> --project src/PickleballGenie.Data --st
 ## Key conventions
 
 - **Request/response DTOs** are defined inline at the bottom of the controller file that uses them (e.g., `RegisterRequest`, `LoginRequest`, `UpdateDuprRequest` in `UsersController.cs`).
-- **DUPR** (Dynamic Universal Pickleball Rating) is a `decimal` in .NET and `Decimal` in Swift. It drives drill filtering and recommendations — keep it `decimal`/`Decimal`, not `double`/`float`.
+- **DUPR** (Dynamic Universal Pickleball Rating) is a `decimal` in .NET and `Decimal` in Swift. It drives drill filtering and recommendations — keep it `decimal`/`Decimal`, not `double`/`float`. The target levels are 3.0 (Beginner), 3.5 (Intermediate), 4.0 (Advanced), and 5.0 (Professional).
 - **Tests** use `EF Core InMemory` with a fresh `Guid`-named database per test and instantiate controllers directly (not via `WebApplicationFactory`).
 - **Swift models** implement `Codable, Equatable, Sendable` on all types; the package targets Swift 6 strict concurrency.
 - **Drill seeding** is handled by `PickleballGenie.Scraper` (a separate console app), not via EF seed data or migrations.
