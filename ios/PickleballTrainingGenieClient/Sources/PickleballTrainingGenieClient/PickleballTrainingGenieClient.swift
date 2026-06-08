@@ -9,66 +9,34 @@ public struct HealthResponse: Codable, Equatable, Sendable {
 
 public struct Drill: Codable, Equatable, Identifiable, Sendable {
     public let id: String
-    public let name: String
+    public let title: String
     public let description: String
-    public let focus: String
-    public let skillLevel: String
-    public let durationMinutes: Int
-}
-
-public struct Recommendation: Codable, Equatable, Sendable {
-    public let drill: Drill
-    public let reason: String
-}
-
-public struct TrainingSessionPayload: Codable, Equatable, Sendable {
-    public let playerName: String
-    public let skillLevel: String
-    public let focus: String
-    public let durationMinutes: Int
-    public let completedDrillIds: [String]
-
-    public init(
-        playerName: String,
-        skillLevel: String,
-        focus: String,
-        durationMinutes: Int,
-        completedDrillIds: [String] = []
-    ) {
-        self.playerName = playerName
-        self.skillLevel = skillLevel
-        self.focus = focus
-        self.durationMinutes = durationMinutes
-        self.completedDrillIds = completedDrillIds
-    }
-}
-
-public struct TrainingSessionRecord: Codable, Equatable, Identifiable, Sendable {
-    public let id: String
-    public let playerName: String
-    public let skillLevel: String
-    public let focus: String
-    public let durationMinutes: Int
-    public let completedDrillIds: [String]
+    public let targetDUPRLevel: Decimal
+    public let category: String
+    public let videoUrl: String?
+    public let sourceUrl: String
     public let createdAt: String
-    public let recommendations: [Recommendation]
 }
 
-public struct DrillsResponse: Codable, Equatable, Sendable {
-    public let drills: [Drill]
+public struct User: Codable, Equatable, Sendable {
+    public let id: String
+    public let email: String
+    public let currentDUPR: Decimal
+    public let targetDUPR: Decimal
 }
 
-public struct RecommendationsResponse: Codable, Equatable, Sendable {
-    public let recommendations: [Recommendation]
+public struct LoginResponse: Codable, Equatable, Sendable {
+    public let token: String
 }
 
-public struct TrainingSessionsResponse: Codable, Equatable, Sendable {
-    public let sessions: [TrainingSessionRecord]
+public struct MessageResponse: Codable, Equatable, Sendable {
+    public let message: String
 }
 
-public struct PickleballTrainingGenieClient {
+public class PickleballTrainingGenieClient {
     public let baseURL: URL
     public let session: URLSession
+    public var jwtToken: String?
     private let decoder = JSONDecoder()
     private let encoder = JSONEncoder()
 
@@ -77,44 +45,58 @@ public struct PickleballTrainingGenieClient {
         self.session = session
     }
 
-    public func health() async throws -> HealthResponse {
-        try await get(path: "health")
+    public func login(email: String, password: String) async throws -> LoginResponse {
+        let payload = ["email": email, "password": password]
+        let response: LoginResponse = try await request(url(path: "api/Users/login"), method: "POST", body: payload, requireAuth: false)
+        self.jwtToken = response.token
+        return response
     }
 
-    public func drills() async throws -> [Drill] {
-        let response: DrillsResponse = try await get(path: "api/drills")
-        return response.drills
+    public func register(email: String, password: String, currentDUPR: Decimal, targetDUPR: Decimal) async throws -> MessageResponse {
+        let payload: [String: Any] = ["email": email, "password": password, "currentDUPR": NSDecimalNumber(decimal: currentDUPR).doubleValue, "targetDUPR": NSDecimalNumber(decimal: targetDUPR).doubleValue]
+        let data = try JSONSerialization.data(withJSONObject: payload)
+        var requestObj = URLRequest(url: url(path: "api/Users/register"))
+        requestObj.httpMethod = "POST"
+        requestObj.setValue("application/json", forHTTPHeaderField: "Accept")
+        requestObj.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        requestObj.httpBody = data
+        let (responseData, response) = try await session.data(for: requestObj)
+        guard let httpResponse = response as? HTTPURLResponse, 200..<300 ~= httpResponse.statusCode else {
+            throw PickleballTrainingGenieError.invalidResponse(statusCode: 0)
+        }
+        return try decoder.decode(MessageResponse.self, from: responseData)
     }
 
-    public func recommendations(skillLevel: String, focus: String) async throws -> [Recommendation] {
-        var components = try urlComponents(path: "api/recommendations")
-        components.queryItems = [
-            URLQueryItem(name: "skillLevel", value: skillLevel),
-            URLQueryItem(name: "focus", value: focus),
-        ]
-
+    public func drills(category: String? = nil, level: Decimal? = nil) async throws -> [Drill] {
+        var components = try urlComponents(path: "api/Drills")
+        var queryItems: [URLQueryItem] = []
+        if let category = category {
+            queryItems.append(URLQueryItem(name: "category", value: category))
+        }
+        if let level = level {
+            queryItems.append(URLQueryItem(name: "level", value: NSDecimalNumber(decimal: level).stringValue))
+        }
+        if !queryItems.isEmpty {
+            components.queryItems = queryItems
+        }
         guard let url = components.url else {
             throw PickleballTrainingGenieError.invalidURL
         }
-
-        let response: RecommendationsResponse = try await request(url, method: "GET")
-        return response.recommendations
+        return try await request(url, method: "GET", requireAuth: false)
     }
 
-    public func createTrainingSession(_ payload: TrainingSessionPayload) async throws -> TrainingSessionRecord {
-        try await request(url(path: "api/training-sessions"), method: "POST", body: payload)
+    public func recommendations() async throws -> [Drill] {
+        return try await request(url(path: "api/Drills/recommendations"), method: "GET", requireAuth: true)
     }
 
-    public func trainingSessions() async throws -> [TrainingSessionRecord] {
-        let response: TrainingSessionsResponse = try await get(path: "api/training-sessions")
-        return response.sessions
+    public func completeDrill(id: String) async throws -> MessageResponse {
+        return try await request(url(path: "api/Drills/\(id)/complete"), method: "POST", body: [String: String](), requireAuth: true)
     }
 
     func urlComponents(path: String) throws -> URLComponents {
         guard let components = URLComponents(url: url(path: path), resolvingAgainstBaseURL: false) else {
             throw PickleballTrainingGenieError.invalidURL
         }
-
         return components
     }
 
@@ -122,17 +104,17 @@ public struct PickleballTrainingGenieClient {
         baseURL.appending(path: path)
     }
 
-    private func get<Response: Decodable>(path: String) async throws -> Response {
-        try await request(url(path: path), method: "GET")
-    }
-
     private func request<Response: Decodable>(
         _ url: URL,
-        method: String
+        method: String,
+        requireAuth: Bool
     ) async throws -> Response {
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if requireAuth, let token = jwtToken {
+            request.setValue("******", forHTTPHeaderField: "Authorization")
+        }
 
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -149,13 +131,17 @@ public struct PickleballTrainingGenieClient {
     private func request<Response: Decodable, Body: Encodable>(
         _ url: URL,
         method: String,
-        body: Body
+        body: Body,
+        requireAuth: Bool
     ) async throws -> Response {
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.httpBody = try encoder.encode(body)
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if requireAuth, let token = jwtToken {
+            request.setValue("******", forHTTPHeaderField: "Authorization")
+        }
 
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
