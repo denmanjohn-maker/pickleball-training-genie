@@ -90,31 +90,31 @@ public class WorkoutsController : ControllerBase
         var drillList = string.Join("\n", drills.Select((d, i) =>
             $"{i + 1}. [{d.Category}] \"{d.Title}\" (~{d.EstimatedDurationMinutes} min, DUPR {d.TargetDUPRLevel}): {d.Description}"));
 
-        var userPrompt = $"""
-            Create a {durationMinutes}-minute pickleball drilling workout for a player with:
-            - Current DUPR: {user.CurrentDUPR} ({DUPRLabel(user.CurrentDUPR)})
-            - Target DUPR: {user.TargetDUPR} ({DUPRLabel(user.TargetDUPR)})
+        var userPrompt = $$"""
+            Create a {{durationMinutes}}-minute pickleball drilling workout for a player with:
+            - Current DUPR: {{user.CurrentDUPR}} ({{DUPRLabel(user.CurrentDUPR)}})
+            - Target DUPR: {{user.TargetDUPR}} ({{DUPRLabel(user.TargetDUPR)}})
 
             Available drills:
-            {drillList}
+            {{drillList}}
 
-            Select drills that fit within {durationMinutes} minutes total. Include warmup and cooldown time. Prioritize variety across categories. For each chosen drill, provide level-specific coaching notes relevant to a DUPR {user.CurrentDUPR} player working toward DUPR {user.TargetDUPR}.
+            Select drills that fit within {{durationMinutes}} minutes total. Include warmup and cooldown time. Prioritize variety across categories. For each chosen drill, provide level-specific coaching notes relevant to a DUPR {{user.CurrentDUPR}} player working toward DUPR {{user.TargetDUPR}}.
 
             Respond with ONLY a valid JSON object matching this exact schema — no markdown, no explanation:
-            {{
+            {
               "drills": [
-                {{
+                {
                   "title": "string",
                   "category": "string",
                   "durationMinutes": 10,
                   "coachingNotes": "string"
-                }}
+                }
               ],
-              "totalDuration": {durationMinutes},
+              "totalDuration": {{durationMinutes}},
               "warmup": "string",
               "cooldown": "string",
               "coachingNotes": "string"
-            }}
+            }
             """;
 
         var requestBody = new
@@ -151,7 +151,7 @@ public class WorkoutsController : ControllerBase
         {
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
             var workoutPlan = JsonSerializer.Deserialize<WorkoutPlanResponse>(textContent, options);
-            return workoutPlan ?? new { rawResponse = textContent };
+            return (object?)workoutPlan ?? new { rawResponse = textContent };
         }
         catch
         {
