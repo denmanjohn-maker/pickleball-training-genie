@@ -11,6 +11,7 @@ public class Drill
     public string Category { get; set; } = string.Empty;
     public string? VideoUrl { get; set; }
     public string SourceUrl { get; set; } = string.Empty;
+    public int EstimatedDurationMinutes { get; set; } = 10;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<UserDrillProgress> UserProgresses { get; set; } = new List<UserDrillProgress>();
