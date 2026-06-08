@@ -1,51 +1,75 @@
 # Pickleball Training Genie
 
-This repository now includes a minimal foundation for:
+This repository provides a complete foundation for a Pickleball training application, including:
 
-- a JSON API that tracks pickleball training sessions and returns drill recommendations
-- an iOS-ready Swift package that can call that API
+- A robust .NET 10 API backed by PostgreSQL to track users, DUPR ratings, and drill recommendations.
+- An iOS-ready Swift package that provides a strongly typed client for the API.
 
 ## Repository layout
 
-- `/api` – Node.js API with in-memory drill and training session data
-- `/ios/PickleballTrainingGenieClient` – Swift package with models and API client methods
+- `/src` – .NET 10 solution containing the backend:
+  - `PickleballGenie.Api` – ASP.NET Core Web API (entry point).
+  - `PickleballGenie.Data` – Entity Framework Core context and migrations.
+  - `PickleballGenie.Models` – Shared domain models (Drill, User, UserDrillProgress).
+  - `PickleballGenie.Tests` – xUnit test project using an in-memory database.
+  - `PickleballGenie.Scraper` – Console application that seeds the database with drills.
+- `/ios/PickleballTrainingGenieClient` – Swift 6 package with models and API client methods.
 
 ## API endpoints
 
-- `GET /health`
-- `GET /api/drills`
-- `GET /api/recommendations?skillLevel=beginner&focus=control`
-- `GET /api/training-sessions`
-- `POST /api/training-sessions`
+**Authentication & Users**
+- `POST /api/Users/register` – Register a new user with email, password, and DUPR rating.
+- `POST /api/Users/login` – Login and receive a JWT Bearer token.
+- `PUT /api/Users/{id}/dupr` – Update a user's DUPR rating.
 
-Example training session payload:
+**Drills**
+- `GET /api/Drills?category=...&level=...` – Get all drills (optionally filtered).
+- `GET /api/Drills/recommendations` – Get drills tailored to the authenticated user's DUPR rating. *(Requires Auth)*
+- `POST /api/Drills/{id}/complete` – Mark a drill as mastered for the authenticated user. *(Requires Auth)*
 
-```json
-{
-  "playerName": "Alex",
-  "skillLevel": "intermediate",
-  "focus": "offense",
-  "durationMinutes": 30,
-  "completedDrillIds": ["speed-up-counter"]
-}
-```
+## Running the API locally
 
-## Running the API
+The API requires a PostgreSQL database. You can run the entire stack (API + Postgres) via Docker Compose, or run them locally.
+
+### Using Docker Compose
 
 ```bash
-cd api
-npm install
-npm test
-npm start
+docker compose up
+```
+The API will be available at `http://localhost:8080`.
+
+### Using .NET CLI
+
+Ensure you have a local PostgreSQL instance running and listening on port `5432` with username `postgres` and password `postgres` (or override `DATABASE_URL` / `DefaultConnection`).
+
+```bash
+cd src/PickleballGenie.Api
+dotnet run
+```
+The API will start and automatically run any pending database migrations.
+
+### Seeding Data
+
+To seed the database with initial drills:
+```bash
+cd src/PickleballGenie.Scraper
+dotnet run
 ```
 
-The API starts on `http://localhost:3000`.
+## Running Tests
 
-## Building the Swift client
+**Backend (.NET):**
+```bash
+dotnet test src/PickleballGenie.Tests/
+```
 
+**iOS Client (Swift):**
 ```bash
 cd ios/PickleballTrainingGenieClient
 swift test
 ```
 
-Use `PickleballTrainingGenieClient` from an iOS app target to fetch drills, recommendations, and recorded sessions from the API.
+## Deployment (Railway)
+
+The API is fully configured for deployment on [Railway](https://railway.app). 
+It automatically parses Railway's provided `DATABASE_URL` (`postgresql://...` or `postgres://...`) into the correct Npgsql connection string format and handles migrations on startup.
