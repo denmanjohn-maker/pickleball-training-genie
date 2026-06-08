@@ -87,19 +87,28 @@ using (var scope = app.Services.CreateScope())
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     dbContext.Database.Migrate();
 
-    // Seed test account
-    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
-    const string testEmail = "denman.john@gmail.com";
-    if (await userManager.FindByEmailAsync(testEmail) == null)
+    // Seed test account in development when explicitly enabled
+    var seedTestAccountEnabled = app.Environment.IsDevelopment() &&
+        builder.Configuration.GetValue<bool>("SeedTestAccount:Enabled");
+    var seedTestAccountEmail = builder.Configuration["SeedTestAccount:Email"];
+    var seedTestAccountPassword = builder.Configuration["SeedTestAccount:Password"];
+    if (seedTestAccountEnabled &&
+        !string.IsNullOrWhiteSpace(seedTestAccountEmail) &&
+        !string.IsNullOrWhiteSpace(seedTestAccountPassword))
     {
-        var testUser = new User
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
+        if (await userManager.FindByEmailAsync(seedTestAccountEmail) == null)
         {
-            UserName = testEmail,
-            Email = testEmail,
-            CurrentDUPR = 4.0m,
-            TargetDUPR = 4.0m
-        };
-        await userManager.CreateAsync(testUser, "Blakd@l3k");
+            var testUser = new User
+            {
+                UserName = seedTestAccountEmail,
+                Email = seedTestAccountEmail,
+                CurrentDUPR = 4.0m,
+                TargetDUPR = 4.0m
+            };
+
+            await userManager.CreateAsync(testUser, seedTestAccountPassword);
+        }
     }
 }
 

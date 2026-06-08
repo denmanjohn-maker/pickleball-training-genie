@@ -1,3 +1,5 @@
 api/node_modules
 ios/PickleballTrainingGenieClient/.build
+src/**/bin/
+src/**/obj/
 .DS_Store
