@@ -87,6 +87,9 @@ using (var scope = app.Services.CreateScope())
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     dbContext.Database.Migrate();
 
+    // Seed drills
+    await DbSeeder.SeedDrillsAsync(dbContext);
+
     // Seed test account
     var userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
     const string testEmail = "denman.john@gmail.com";
