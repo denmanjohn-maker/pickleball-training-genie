@@ -12,7 +12,7 @@ var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
     ?? Environment.GetEnvironmentVariable("DATABASE_URL"); // Fallback for Railway
 
-if (!string.IsNullOrEmpty(connectionString) && connectionString.StartsWith("postgres://"))
+if (!string.IsNullOrEmpty(connectionString) && (connectionString.StartsWith("postgres://") || connectionString.StartsWith("postgresql://")))
 {
     // Railway gives postgres://user:password@host:port/db
     var uri = new Uri(connectionString);

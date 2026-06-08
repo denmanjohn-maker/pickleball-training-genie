@@ -17,7 +17,7 @@ class Program
         var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL") 
             ?? "Host=localhost;Port=5432;Database=pickleball_genie;Username=postgres;Password=postgres";
 
-        if (connectionString.StartsWith("postgres://"))
+        if (connectionString.StartsWith("postgres://") || connectionString.StartsWith("postgresql://"))
         {
             var uri = new Uri(connectionString);
             var userInfo = uri.UserInfo.Split(':');
