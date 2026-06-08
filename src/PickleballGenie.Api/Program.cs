@@ -86,6 +86,21 @@ using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     dbContext.Database.Migrate();
+
+    // Seed test account
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
+    const string testEmail = "denman.john@gmail.com";
+    if (await userManager.FindByEmailAsync(testEmail) == null)
+    {
+        var testUser = new User
+        {
+            UserName = testEmail,
+            Email = testEmail,
+            CurrentDUPR = 4.0m,
+            TargetDUPR = 4.0m
+        };
+        await userManager.CreateAsync(testUser, "Blakd@l3k");
+    }
 }
 
 // Configure the HTTP request pipeline.
