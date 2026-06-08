@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("PickleballGenie.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+41af66f9b002b6339fb3231b84713375cb887415")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+afccc8205d0719af91e3e962fb6c90925dcff18b")]
 [assembly: System.Reflection.AssemblyProductAttribute("PickleballGenie.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("PickleballGenie.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

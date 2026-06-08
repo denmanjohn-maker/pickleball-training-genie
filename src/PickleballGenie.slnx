@@ -3,4 +3,5 @@
   <Project Path="PickleballGenie.Data/PickleballGenie.Data.csproj" />
   <Project Path="PickleballGenie.Models/PickleballGenie.Models.csproj" />
   <Project Path="PickleballGenie.Scraper/PickleballGenie.Scraper.csproj" />
+  <Project Path="PickleballGenie.Tests/PickleballGenie.Tests.csproj" />
 </Solution>
