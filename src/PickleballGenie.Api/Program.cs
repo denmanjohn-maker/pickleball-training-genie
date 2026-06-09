@@ -19,7 +19,8 @@ if (!string.IsNullOrEmpty(connectionString) && (connectionString.StartsWith("pos
     var uri = new Uri(connectionString);
     var userInfo = uri.UserInfo.Split(':');
     var password = userInfo.Length > 1 ? userInfo[1] : "";
-    connectionString = $"Host={uri.Host};Port={uri.Port};Database={uri.LocalPath.TrimStart('/')};Username={userInfo[0]};Password={password};SslMode=Require;TrustServerCertificate=True;";
+    var sslMode = uri.Host.EndsWith(".railway.internal") ? "SslMode=Disable" : "SslMode=Require;TrustServerCertificate=True";
+    connectionString = $"Host={uri.Host};Port={uri.Port};Database={uri.LocalPath.TrimStart('/')};Username={userInfo[0]};Password={password};{sslMode};";
 }
 
 builder.Services.AddDbContext<AppDbContext>(options =>
