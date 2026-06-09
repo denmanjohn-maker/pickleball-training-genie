@@ -66,7 +66,7 @@ public class WorkoutsControllerTests
         await context.SaveChangesAsync();
 
         var captured = "";
-        var handler = new CapturingHttpMessageHandler(req =>
+        var handler = new CapturingHttpMessageHandler(async req =>
         {
             captured = req.Content != null ? await req.Content.ReadAsStringAsync() : "";
             return new HttpResponseMessage(HttpStatusCode.OK)
@@ -107,7 +107,7 @@ public class WorkoutsControllerTests
         await context.SaveChangesAsync();
 
         var captured = "";
-        var handler = new CapturingHttpMessageHandler(req =>
+        var handler = new CapturingHttpMessageHandler(async req =>
         {
             captured = req.Content != null ? await req.Content.ReadAsStringAsync() : "";
             return new HttpResponseMessage(HttpStatusCode.OK)
@@ -259,6 +259,36 @@ public class WorkoutsControllerTests
 
         var statusResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(503, statusResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task GenerateWorkout_DeserializesWorkoutPlan_WhenClaudeWrapsResponseInMarkdownFences()
+    {
+        var options = InMemoryOptions();
+        using var context = new AppDbContext(options);
+
+        var userId = Guid.NewGuid();
+        var user = new User { Id = userId, UserName = "u", Email = "u@t.com", CurrentDUPR = 3.0m, TargetDUPR = 3.5m };
+        context.Users.Add(user);
+        context.Drills.Add(new Drill { Title = "Dink", TargetDUPRLevel = 3.0m, Category = "Dinking", EstimatedDurationMinutes = 10 });
+        await context.SaveChangesAsync();
+
+        var workoutJson = "{\"drills\":[{\"title\":\"Dink\",\"category\":\"Dinking\",\"durationMinutes\":10,\"coachingNotes\":\"Focus on soft hands.\"}],\"totalDuration\":30,\"warmup\":\"Stretch\",\"cooldown\":\"Rest\",\"coachingNotes\":\"Great session.\"}";
+        var fencedText = $"```json\n{workoutJson}\n```";
+        var anthropicResponse = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(
+                JsonSerializer.Serialize(new { content = new[] { new { text = fencedText } } }),
+                Encoding.UTF8, "application/json")
+        };
+        var controller = BuildController(context, user, anthropicResponse);
+
+        var result = await controller.GenerateWorkout(new GenerateWorkoutRequest { DurationMinutes = 30 });
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var plan = Assert.IsType<WorkoutPlanResponse>(ok.Value);
+        Assert.Single(plan.Drills);
+        Assert.Equal("Dink", plan.Drills[0].Title);
     }
 }
 
