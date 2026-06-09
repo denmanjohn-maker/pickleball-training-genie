@@ -147,19 +147,19 @@ public class WorkoutsController : ControllerBase
             .GetProperty("text")
             .GetString() ?? "";
 
-        var json = textContent.Trim();
-        if (json.StartsWith("```"))
+        var strippedText = textContent.Trim();
+        if (strippedText.StartsWith("```"))
         {
-            var firstNewline = json.IndexOf('\n');
-            var lastFence = json.LastIndexOf("```");
+            var firstNewline = strippedText.IndexOf('\n');
+            var lastFence = strippedText.LastIndexOf("```");
             if (firstNewline >= 0 && lastFence > firstNewline)
-                json = json[(firstNewline + 1)..lastFence].Trim();
+                strippedText = strippedText[(firstNewline + 1)..lastFence].Trim();
         }
 
         try
         {
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            var workoutPlan = JsonSerializer.Deserialize<WorkoutPlanResponse>(json, options);
+            var workoutPlan = JsonSerializer.Deserialize<WorkoutPlanResponse>(strippedText, options);
             return (object?)workoutPlan ?? new { rawResponse = textContent };
         }
         catch
