@@ -66,7 +66,7 @@ public class WorkoutsControllerTests
         await context.SaveChangesAsync();
 
         var captured = "";
-        var handler = new CapturingHttpMessageHandler(req =>
+        var handler = new CapturingHttpMessageHandler(async req =>
         {
             captured = req.Content != null ? await req.Content.ReadAsStringAsync() : "";
             return new HttpResponseMessage(HttpStatusCode.OK)
@@ -107,7 +107,7 @@ public class WorkoutsControllerTests
         await context.SaveChangesAsync();
 
         var captured = "";
-        var handler = new CapturingHttpMessageHandler(req =>
+        var handler = new CapturingHttpMessageHandler(async req =>
         {
             captured = req.Content != null ? await req.Content.ReadAsStringAsync() : "";
             return new HttpResponseMessage(HttpStatusCode.OK)
