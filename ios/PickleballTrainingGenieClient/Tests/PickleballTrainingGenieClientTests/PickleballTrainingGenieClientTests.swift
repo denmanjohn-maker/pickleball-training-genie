@@ -10,6 +10,40 @@ import Testing
     #expect(components.url?.absoluteString == "https://example.com/api/Drills/recommendations")
 }
 
+@Test func generateWorkoutUsesExpectedURL() async throws {
+    let client = PickleballTrainingGenieClient(baseURL: URL(string: "https://example.com/")!)
+
+    let components = try client.urlComponents(path: "api/workouts/generate")
+
+    #expect(components.url?.absoluteString == "https://example.com/api/workouts/generate")
+}
+
+@Test func workoutPlanResponseDecodesAPIShape() throws {
+    let json = """
+    {
+      "drills": [
+        {
+          "title": "Cross-Court Dink Rally",
+          "category": "Dinking",
+          "durationMinutes": 10,
+          "coachingNotes": "Focus on soft hands."
+        }
+      ],
+      "totalDuration": 30,
+      "warmup": "Light stretching",
+      "cooldown": "Cool down walk",
+      "coachingNotes": "Great session plan."
+    }
+    """.data(using: .utf8)!
+
+    let decoded = try JSONDecoder().decode(WorkoutPlanResponse.self, from: json)
+
+    #expect(decoded.totalDuration == 30)
+    #expect(decoded.drills.count == 1)
+    #expect(decoded.drills[0].title == "Cross-Court Dink Rally")
+    #expect(decoded.drills[0].durationMinutes == 10)
+}
+
 @Test func recommendationDecodesAPIShape() throws {
     let json = """
     [

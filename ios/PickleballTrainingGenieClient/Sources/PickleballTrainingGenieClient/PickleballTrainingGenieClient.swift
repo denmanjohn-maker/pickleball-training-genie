@@ -33,6 +33,21 @@ public struct MessageResponse: Codable, Equatable, Sendable {
     public let message: String
 }
 
+public struct WorkoutDrillItem: Codable, Equatable, Sendable {
+    public let title: String
+    public let category: String
+    public let durationMinutes: Int
+    public let coachingNotes: String
+}
+
+public struct WorkoutPlanResponse: Codable, Equatable, Sendable {
+    public let drills: [WorkoutDrillItem]
+    public let totalDuration: Int
+    public let warmup: String
+    public let cooldown: String
+    public let coachingNotes: String
+}
+
 public class PickleballTrainingGenieClient {
     public let baseURL: URL
     public let session: URLSession
@@ -93,6 +108,11 @@ public class PickleballTrainingGenieClient {
         return try await request(url(path: "api/Drills/\(id)/complete"), method: "POST", body: [String: String](), requireAuth: true)
     }
 
+    public func generateWorkout(durationMinutes: Int? = nil) async throws -> WorkoutPlanResponse {
+        struct Request: Encodable { let durationMinutes: Int? }
+        return try await request(url(path: "api/workouts/generate"), method: "POST", body: Request(durationMinutes: durationMinutes), requireAuth: true)
+    }
+
     func urlComponents(path: String) throws -> URLComponents {
         guard let components = URLComponents(url: url(path: path), resolvingAgainstBaseURL: false) else {
             throw PickleballTrainingGenieError.invalidURL
@@ -113,7 +133,7 @@ public class PickleballTrainingGenieClient {
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if requireAuth, let token = jwtToken {
-            request.setValue("******", forHTTPHeaderField: "Authorization")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
 
         let (data, response) = try await session.data(for: request)
@@ -140,7 +160,7 @@ public class PickleballTrainingGenieClient {
         request.httpBody = try encoder.encode(body)
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if requireAuth, let token = jwtToken {
-            request.setValue("******", forHTTPHeaderField: "Authorization")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
 
         let (data, response) = try await session.data(for: request)
