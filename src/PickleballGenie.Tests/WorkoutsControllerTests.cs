@@ -290,6 +290,31 @@ public class WorkoutsControllerTests
         Assert.Single(plan.Drills);
         Assert.Equal("Dink", plan.Drills[0].Title);
     }
+
+    [Fact]
+    public async Task GenerateWorkout_Returns502_WhenAIResponseCannotBeParsed()
+    {
+        var options = InMemoryOptions();
+        using var context = new AppDbContext(options);
+
+        var userId = Guid.NewGuid();
+        var user = new User { Id = userId, UserName = "u", Email = "u@t.com", CurrentDUPR = 3.0m, TargetDUPR = 3.5m };
+        context.Users.Add(user);
+        context.Drills.Add(new Drill { Title = "Dink", TargetDUPRLevel = 3.0m, Category = "Dinking", EstimatedDurationMinutes = 10 });
+        await context.SaveChangesAsync();
+
+        var unparseable = JsonSerializer.Serialize(new { content = new[] { new { text = "Sorry, I cannot generate a workout right now." } } });
+        var anthropicResponse = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(unparseable, Encoding.UTF8, "application/json")
+        };
+        var controller = BuildController(context, user, anthropicResponse);
+
+        var result = await controller.GenerateWorkout(new GenerateWorkoutRequest { DurationMinutes = 30 });
+
+        var statusResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(502, statusResult.StatusCode);
+    }
 }
 
 // Fake IHttpClientFactory that returns an HttpClient backed by a fixed response

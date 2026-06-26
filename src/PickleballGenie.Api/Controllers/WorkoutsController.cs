@@ -83,9 +83,13 @@ public class WorkoutsController : ControllerBase
         {
             return StatusCode(502, new { error = "AI service returned an error.", details = ex.Message });
         }
+        catch (WorkoutDeserializationException ex)
+        {
+            return StatusCode(502, new { error = "AI returned a response that could not be parsed.", details = ex.Message, rawResponse = ex.RawResponse });
+        }
     }
 
-    private async Task<object> GenerateWithClaude(string apiKey, User user, List<Drill> drills, int durationMinutes)
+    private async Task<WorkoutPlanResponse> GenerateWithClaude(string apiKey, User user, List<Drill> drills, int durationMinutes)
     {
         var drillList = string.Join("\n", drills.Select((d, i) =>
             $"{i + 1}. [{d.Category}] \"{d.Title}\" (~{d.EstimatedDurationMinutes} min, DUPR {d.TargetDUPRLevel}): {d.Description}"));
@@ -160,11 +164,17 @@ public class WorkoutsController : ControllerBase
         {
             var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
             var workoutPlan = JsonSerializer.Deserialize<WorkoutPlanResponse>(strippedText, options);
-            return (object?)workoutPlan ?? new { rawResponse = textContent };
+            if (workoutPlan == null)
+                throw new WorkoutDeserializationException("AI returned a null response.", textContent);
+            return workoutPlan;
         }
-        catch
+        catch (WorkoutDeserializationException)
         {
-            return new { rawResponse = textContent };
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw new WorkoutDeserializationException($"Failed to parse AI response: {ex.Message}", textContent);
         }
     }
 
@@ -180,6 +190,15 @@ public class WorkoutsController : ControllerBase
 public class WorkoutGenerationException : Exception
 {
     public WorkoutGenerationException(string message) : base(message) { }
+}
+
+public class WorkoutDeserializationException : Exception
+{
+    public string RawResponse { get; }
+    public WorkoutDeserializationException(string message, string rawResponse) : base(message)
+    {
+        RawResponse = rawResponse;
+    }
 }
 
 public class GenerateWorkoutRequest
