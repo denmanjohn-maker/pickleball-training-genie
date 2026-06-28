@@ -121,17 +121,22 @@ public class UsersController : ControllerBase
         if (user == null)
             return NotFound();
 
-        // Disallow manual update if DUPR is officially linked
         if (user.IsDuprLinked)
-            return BadRequest(new { Message = "Cannot manually update ratings for a linked DUPR account." });
-
-        user.SinglesDUPR = request.SinglesDUPR;
-        user.DoublesDUPR = request.DoublesDUPR;
+        {
+            // DUPR-linked accounts cannot override their official ratings, but can set their target
+            if (request.SinglesDUPR.HasValue || request.DoublesDUPR.HasValue)
+                return BadRequest(new { Message = "Cannot manually update ratings for a linked DUPR account." });
+        }
+        else
+        {
+            user.SinglesDUPR = request.SinglesDUPR;
+            user.DoublesDUPR = request.DoublesDUPR;
+        }
 
         if (request.TargetDUPR.HasValue)
         {
-            var newCurrentDUPR = Math.Max(request.SinglesDUPR ?? 0m, request.DoublesDUPR ?? 0m);
-            if (request.TargetDUPR.Value < newCurrentDUPR)
+            var currentDUPR = Math.Max(user.SinglesDUPR ?? 0m, user.DoublesDUPR ?? 0m);
+            if (request.TargetDUPR.Value < currentDUPR)
                 return BadRequest(new { Message = "Target DUPR must be greater than or equal to your current DUPR." });
             user.TargetDUPR = request.TargetDUPR.Value;
         }
