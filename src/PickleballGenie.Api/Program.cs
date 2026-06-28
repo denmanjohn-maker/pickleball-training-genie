@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using PickleballGenie.Data;
 using PickleballGenie.Models;
+using PickleballGenie.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
@@ -10,7 +11,7 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? Environment.GetEnvironmentVariable("DATABASE_URL"); // Fallback for Railway
 
 if (!string.IsNullOrEmpty(connectionString) && (connectionString.StartsWith("postgres://") || connectionString.StartsWith("postgresql://")))
@@ -59,6 +60,12 @@ builder.Services.AddHttpClient("anthropic", client =>
     client.BaseAddress = new Uri("https://api.anthropic.com/");
     client.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
 });
+
+builder.Services.AddHttpClient<IDuprService, DuprService>(client =>
+{
+    var baseUrl = builder.Configuration["Dupr:BaseUrl"] ?? "https://api.dupr.com/";
+    client.BaseAddress = new Uri(baseUrl);
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -97,7 +104,7 @@ using (var scope = app.Services.CreateScope())
         {
             UserName = testEmail,
             Email = testEmail,
-            CurrentDUPR = 4.0m,
+            SinglesDUPR = 4.0m,
             TargetDUPR = 4.0m
         };
         await userManager.CreateAsync(testUser, "Blakd@l3k");
