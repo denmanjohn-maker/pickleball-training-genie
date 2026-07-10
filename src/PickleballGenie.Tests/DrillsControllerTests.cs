@@ -31,7 +31,7 @@ public class DrillsControllerTests
             Id = userId,
             Email = "test@example.com",
             UserName = "test@example.com",
-            CurrentDUPR = 3.0m,
+            SinglesDUPR = 3.0m,
             TargetDUPR = 3.5m
         };
         context.Users.Add(user);
