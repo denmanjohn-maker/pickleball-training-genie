@@ -2,7 +2,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using PickleballGenie.Api.Controllers;
+using PickleballGenie.Api.Services;
 using PickleballGenie.Data;
 using PickleballGenie.Models;
 using System.Net;
@@ -22,17 +24,18 @@ public class WorkoutsControllerTests
     private static WorkoutsController BuildController(
         AppDbContext context,
         User user,
-        HttpResponseMessage anthropicResponse,
-        string? anthropicApiKey = "test-key")
+        HttpMessageHandler llmHandler,
+        string? deepInfraApiKey = "test-key")
     {
         var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(anthropicApiKey != null
-                ? new Dictionary<string, string?> { ["AnthropicApiKey"] = anthropicApiKey }
+            .AddInMemoryCollection(deepInfraApiKey != null
+                ? new Dictionary<string, string?> { ["DeepInfraApiKey"] = deepInfraApiKey }
                 : new Dictionary<string, string?>())
             .Build();
 
-        var factory = new FakeHttpClientFactory(anthropicResponse);
-        var controller = new WorkoutsController(context, factory, config);
+        var httpClient = new HttpClient(llmHandler) { BaseAddress = new Uri("https://api.deepinfra.com/") };
+        var llmService = new DeepInfraWorkoutLlmService(httpClient, config, NullLogger<DeepInfraWorkoutLlmService>.Instance);
+        var controller = new WorkoutsController(context, llmService);
 
         var claims = new ClaimsPrincipal(new ClaimsIdentity(new[]
         {
@@ -47,10 +50,17 @@ public class WorkoutsControllerTests
         return controller;
     }
 
-    private static string ValidAnthropicResponse(string workoutJson) =>
+    private static WorkoutsController BuildController(
+        AppDbContext context,
+        User user,
+        HttpResponseMessage llmResponse,
+        string? deepInfraApiKey = "test-key")
+        => BuildController(context, user, new StaticHttpMessageHandler(llmResponse), deepInfraApiKey);
+
+    private static string ValidLlmResponse(string workoutJson) =>
         JsonSerializer.Serialize(new
         {
-            content = new[] { new { text = workoutJson } }
+            choices = new[] { new { message = new { content = workoutJson } } }
         });
 
     [Fact]
@@ -60,7 +70,7 @@ public class WorkoutsControllerTests
         using var context = new AppDbContext(options);
 
         var userId = Guid.NewGuid();
-        var user = new User { Id = userId, UserName = "u", Email = "u@t.com", CurrentDUPR = 3.0m, TargetDUPR = 3.5m, PreferredSessionDurationMinutes = 60 };
+        var user = new User { Id = userId, UserName = "u", Email = "u@t.com", SinglesDUPR = 3.0m, TargetDUPR = 3.5m, PreferredSessionDurationMinutes = 60 };
         context.Users.Add(user);
         context.Drills.Add(new Drill { Title = "Dink", TargetDUPRLevel = 3.0m, Category = "Dinking", EstimatedDurationMinutes = 10 });
         await context.SaveChangesAsync();
@@ -71,22 +81,11 @@ public class WorkoutsControllerTests
             captured = req.Content != null ? await req.Content.ReadAsStringAsync() : "";
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent(ValidAnthropicResponse("{\"drills\":[],\"totalDuration\":30,\"warmup\":\"\",\"cooldown\":\"\",\"coachingNotes\":\"\"}"), Encoding.UTF8, "application/json")
+                Content = new StringContent(ValidLlmResponse("{\"drills\":[],\"totalDuration\":30,\"warmup\":\"\",\"cooldown\":\"\",\"coachingNotes\":\"\"}"), Encoding.UTF8, "application/json")
             };
         });
 
-        var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> { ["AnthropicApiKey"] = "test" })
-            .Build();
-
-        var controller = new WorkoutsController(context, new FakeHttpClientFactory(handler), config);
-        controller.ControllerContext = new ControllerContext
-        {
-            HttpContext = new DefaultHttpContext
-            {
-                User = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim(ClaimTypes.NameIdentifier, userId.ToString()) }, "mock"))
-            }
-        };
+        var controller = BuildController(context, user, handler);
 
         var result = await controller.GenerateWorkout(new GenerateWorkoutRequest { DurationMinutes = 30 });
 
@@ -101,7 +100,7 @@ public class WorkoutsControllerTests
         using var context = new AppDbContext(options);
 
         var userId = Guid.NewGuid();
-        var user = new User { Id = userId, UserName = "u", Email = "u@t.com", CurrentDUPR = 3.0m, TargetDUPR = 3.5m, PreferredSessionDurationMinutes = 45 };
+        var user = new User { Id = userId, UserName = "u", Email = "u@t.com", SinglesDUPR = 3.0m, TargetDUPR = 3.5m, PreferredSessionDurationMinutes = 45 };
         context.Users.Add(user);
         context.Drills.Add(new Drill { Title = "Dink", TargetDUPRLevel = 3.0m, Category = "Dinking", EstimatedDurationMinutes = 10 });
         await context.SaveChangesAsync();
@@ -112,22 +111,11 @@ public class WorkoutsControllerTests
             captured = req.Content != null ? await req.Content.ReadAsStringAsync() : "";
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent(ValidAnthropicResponse("{\"drills\":[],\"totalDuration\":45,\"warmup\":\"\",\"cooldown\":\"\",\"coachingNotes\":\"\"}"), Encoding.UTF8, "application/json")
+                Content = new StringContent(ValidLlmResponse("{\"drills\":[],\"totalDuration\":45,\"warmup\":\"\",\"cooldown\":\"\",\"coachingNotes\":\"\"}"), Encoding.UTF8, "application/json")
             };
         });
 
-        var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> { ["AnthropicApiKey"] = "test" })
-            .Build();
-
-        var controller = new WorkoutsController(context, new FakeHttpClientFactory(handler), config);
-        controller.ControllerContext = new ControllerContext
-        {
-            HttpContext = new DefaultHttpContext
-            {
-                User = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim(ClaimTypes.NameIdentifier, userId.ToString()) }, "mock"))
-            }
-        };
+        var controller = BuildController(context, user, handler);
 
         var result = await controller.GenerateWorkout(new GenerateWorkoutRequest { DurationMinutes = null });
 
@@ -142,7 +130,7 @@ public class WorkoutsControllerTests
         using var context = new AppDbContext(options);
 
         var userId = Guid.NewGuid();
-        var user = new User { Id = userId, UserName = "u", Email = "u@t.com", CurrentDUPR = 3.0m, TargetDUPR = 3.5m };
+        var user = new User { Id = userId, UserName = "u", Email = "u@t.com", SinglesDUPR = 3.0m, TargetDUPR = 3.5m };
         context.Users.Add(user);
         // Only a 4.0 drill — outside range
         context.Drills.Add(new Drill { Title = "Advanced", TargetDUPRLevel = 4.0m, Category = "Dinking", EstimatedDurationMinutes = 10 });
@@ -164,20 +152,12 @@ public class WorkoutsControllerTests
         using var context = new AppDbContext(options);
 
         var userId = Guid.NewGuid();
-        var user = new User { Id = userId, UserName = "u", Email = "u@t.com", CurrentDUPR = 3.0m, TargetDUPR = 3.5m };
+        var user = new User { Id = userId, UserName = "u", Email = "u@t.com", SinglesDUPR = 3.0m, TargetDUPR = 3.5m };
         context.Users.Add(user);
         context.Drills.Add(new Drill { Title = "Dink", TargetDUPRLevel = 3.0m, Category = "Dinking", EstimatedDurationMinutes = 10 });
         await context.SaveChangesAsync();
 
-        var config = new ConfigurationBuilder().Build(); // no API key
-        var controller = new WorkoutsController(context, new FakeHttpClientFactory(new HttpResponseMessage()), config);
-        controller.ControllerContext = new ControllerContext
-        {
-            HttpContext = new DefaultHttpContext
-            {
-                User = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim(ClaimTypes.NameIdentifier, userId.ToString()) }, "mock"))
-            }
-        };
+        var controller = BuildController(context, user, new HttpResponseMessage(), deepInfraApiKey: null);
 
         var result = await controller.GenerateWorkout(new GenerateWorkoutRequest { DurationMinutes = 30 });
 
@@ -186,13 +166,13 @@ public class WorkoutsControllerTests
     }
 
     [Fact]
-    public async Task GenerateWorkout_Returns502_WhenAnthropicFails()
+    public async Task GenerateWorkout_Returns502_WhenLlmFails()
     {
         var options = InMemoryOptions();
         using var context = new AppDbContext(options);
 
         var userId = Guid.NewGuid();
-        var user = new User { Id = userId, UserName = "u", Email = "u@t.com", CurrentDUPR = 3.0m, TargetDUPR = 3.5m };
+        var user = new User { Id = userId, UserName = "u", Email = "u@t.com", SinglesDUPR = 3.0m, TargetDUPR = 3.5m };
         context.Users.Add(user);
         context.Drills.Add(new Drill { Title = "Dink", TargetDUPRLevel = 3.0m, Category = "Dinking", EstimatedDurationMinutes = 10 });
         await context.SaveChangesAsync();
@@ -216,7 +196,7 @@ public class WorkoutsControllerTests
         using var context = new AppDbContext(options);
 
         var userId = Guid.NewGuid();
-        var user = new User { Id = userId, UserName = "u", Email = "u@t.com", CurrentDUPR = 4.0m, TargetDUPR = 3.0m };
+        var user = new User { Id = userId, UserName = "u", Email = "u@t.com", SinglesDUPR = 4.0m, TargetDUPR = 3.0m };
         context.Users.Add(user);
         await context.SaveChangesAsync();
 
@@ -235,25 +215,13 @@ public class WorkoutsControllerTests
         using var context = new AppDbContext(options);
 
         var userId = Guid.NewGuid();
-        var user = new User { Id = userId, UserName = "u", Email = "u@t.com", CurrentDUPR = 3.0m, TargetDUPR = 3.5m };
+        var user = new User { Id = userId, UserName = "u", Email = "u@t.com", SinglesDUPR = 3.0m, TargetDUPR = 3.5m };
         context.Users.Add(user);
         context.Drills.Add(new Drill { Title = "Dink", TargetDUPRLevel = 3.0m, Category = "Dinking", EstimatedDurationMinutes = 10 });
         await context.SaveChangesAsync();
 
-        // Config has an empty string key — should NOT be used
-        var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> { ["AnthropicApiKey"] = "   " })
-            .Build();
-
-        // No env var set either — should get 503
-        var controller = new WorkoutsController(context, new FakeHttpClientFactory(new HttpResponseMessage()), config);
-        controller.ControllerContext = new ControllerContext
-        {
-            HttpContext = new DefaultHttpContext
-            {
-                User = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim(ClaimTypes.NameIdentifier, userId.ToString()) }, "mock"))
-            }
-        };
+        // Config has a whitespace-only key — should NOT be used. No env var set either — should get 503.
+        var controller = BuildController(context, user, new HttpResponseMessage(), deepInfraApiKey: "   ");
 
         var result = await controller.GenerateWorkout(new GenerateWorkoutRequest { DurationMinutes = 30 });
 
@@ -262,26 +230,24 @@ public class WorkoutsControllerTests
     }
 
     [Fact]
-    public async Task GenerateWorkout_DeserializesWorkoutPlan_WhenClaudeWrapsResponseInMarkdownFences()
+    public async Task GenerateWorkout_DeserializesWorkoutPlan_WhenLlmWrapsResponseInMarkdownFences()
     {
         var options = InMemoryOptions();
         using var context = new AppDbContext(options);
 
         var userId = Guid.NewGuid();
-        var user = new User { Id = userId, UserName = "u", Email = "u@t.com", CurrentDUPR = 3.0m, TargetDUPR = 3.5m };
+        var user = new User { Id = userId, UserName = "u", Email = "u@t.com", SinglesDUPR = 3.0m, TargetDUPR = 3.5m };
         context.Users.Add(user);
         context.Drills.Add(new Drill { Title = "Dink", TargetDUPRLevel = 3.0m, Category = "Dinking", EstimatedDurationMinutes = 10 });
         await context.SaveChangesAsync();
 
         var workoutJson = "{\"drills\":[{\"title\":\"Dink\",\"category\":\"Dinking\",\"durationMinutes\":10,\"coachingNotes\":\"Focus on soft hands.\"}],\"totalDuration\":30,\"warmup\":\"Stretch\",\"cooldown\":\"Rest\",\"coachingNotes\":\"Great session.\"}";
         var fencedText = $"```json\n{workoutJson}\n```";
-        var anthropicResponse = new HttpResponseMessage(HttpStatusCode.OK)
+        var llmResponse = new HttpResponseMessage(HttpStatusCode.OK)
         {
-            Content = new StringContent(
-                JsonSerializer.Serialize(new { content = new[] { new { text = fencedText } } }),
-                Encoding.UTF8, "application/json")
+            Content = new StringContent(ValidLlmResponse(fencedText), Encoding.UTF8, "application/json")
         };
-        var controller = BuildController(context, user, anthropicResponse);
+        var controller = BuildController(context, user, llmResponse);
 
         var result = await controller.GenerateWorkout(new GenerateWorkoutRequest { DurationMinutes = 30 });
 
@@ -298,39 +264,21 @@ public class WorkoutsControllerTests
         using var context = new AppDbContext(options);
 
         var userId = Guid.NewGuid();
-        var user = new User { Id = userId, UserName = "u", Email = "u@t.com", CurrentDUPR = 3.0m, TargetDUPR = 3.5m };
+        var user = new User { Id = userId, UserName = "u", Email = "u@t.com", SinglesDUPR = 3.0m, TargetDUPR = 3.5m };
         context.Users.Add(user);
         context.Drills.Add(new Drill { Title = "Dink", TargetDUPRLevel = 3.0m, Category = "Dinking", EstimatedDurationMinutes = 10 });
         await context.SaveChangesAsync();
 
-        var unparseable = JsonSerializer.Serialize(new { content = new[] { new { text = "Sorry, I cannot generate a workout right now." } } });
-        var anthropicResponse = new HttpResponseMessage(HttpStatusCode.OK)
+        var llmResponse = new HttpResponseMessage(HttpStatusCode.OK)
         {
-            Content = new StringContent(unparseable, Encoding.UTF8, "application/json")
+            Content = new StringContent(ValidLlmResponse("Sorry, I cannot generate a workout right now."), Encoding.UTF8, "application/json")
         };
-        var controller = BuildController(context, user, anthropicResponse);
+        var controller = BuildController(context, user, llmResponse);
 
         var result = await controller.GenerateWorkout(new GenerateWorkoutRequest { DurationMinutes = 30 });
 
         var statusResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(502, statusResult.StatusCode);
-    }
-}
-
-// Fake IHttpClientFactory that returns an HttpClient backed by a fixed response
-file class FakeHttpClientFactory : IHttpClientFactory
-{
-    private readonly HttpMessageHandler _handler;
-
-    public FakeHttpClientFactory(HttpResponseMessage response)
-        : this(new StaticHttpMessageHandler(response)) { }
-
-    public FakeHttpClientFactory(HttpMessageHandler handler) => _handler = handler;
-
-    public HttpClient CreateClient(string name)
-    {
-        var client = new HttpClient(_handler) { BaseAddress = new Uri("https://api.anthropic.com/") };
-        return client;
     }
 }
 

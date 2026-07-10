@@ -1,12 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using PickleballGenie.Api.Services;
 using PickleballGenie.Data;
-using PickleballGenie.Models;
-using System.Net.Http.Headers;
 using System.Security.Claims;
-using System.Text;
-using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace PickleballGenie.Api.Controllers;
@@ -17,18 +14,16 @@ namespace PickleballGenie.Api.Controllers;
 public class WorkoutsController : ControllerBase
 {
     private readonly AppDbContext _context;
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly IConfiguration _configuration;
+    private readonly IWorkoutLlmService _llmService;
 
-    public WorkoutsController(AppDbContext context, IHttpClientFactory httpClientFactory, IConfiguration configuration)
+    public WorkoutsController(AppDbContext context, IWorkoutLlmService llmService)
     {
         _context = context;
-        _httpClientFactory = httpClientFactory;
-        _configuration = configuration;
+        _llmService = llmService;
     }
 
     /// <summary>
-    /// Generates a personalized drilling workout using Claude AI.
+    /// Generates a personalized drilling workout using an LLM.
     /// The workout is tailored to the authenticated user's current DUPR level, target DUPR level,
     /// and the requested session duration.
     /// </summary>
@@ -62,18 +57,14 @@ public class WorkoutsController : ControllerBase
         if (!drills.Any())
             return BadRequest("No drills found for your DUPR range. Please run the scraper to populate the drill database.");
 
-        var configKey = _configuration["AnthropicApiKey"];
-        var apiKey = !string.IsNullOrWhiteSpace(configKey)
-            ? configKey
-            : Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
-
-        if (string.IsNullOrWhiteSpace(apiKey))
-            return StatusCode(503, "Workout generation is not configured. Please set ANTHROPIC_API_KEY.");
-
         try
         {
-            var workoutPlan = await GenerateWithClaude(apiKey, user, drills, durationMinutes);
+            var workoutPlan = await _llmService.GeneratePlanAsync(user, drills, durationMinutes);
             return Ok(workoutPlan);
+        }
+        catch (WorkoutConfigurationException ex)
+        {
+            return StatusCode(503, ex.Message);
         }
         catch (HttpRequestException ex)
         {
@@ -87,117 +78,6 @@ public class WorkoutsController : ControllerBase
         {
             return StatusCode(502, new { error = "AI returned a response that could not be parsed.", details = ex.Message, rawResponse = ex.RawResponse });
         }
-    }
-
-    private async Task<WorkoutPlanResponse> GenerateWithClaude(string apiKey, User user, List<Drill> drills, int durationMinutes)
-    {
-        var drillList = string.Join("\n", drills.Select((d, i) =>
-            $"{i + 1}. [{d.Category}] \"{d.Title}\" (~{d.EstimatedDurationMinutes} min, DUPR {d.TargetDUPRLevel}): {d.Description}"));
-
-        var userPrompt = $$"""
-            Create a {{durationMinutes}}-minute pickleball drilling workout for a player with:
-            - Current DUPR: {{user.CurrentDUPR}} ({{DUPRLabel(user.CurrentDUPR)}})
-            - Target DUPR: {{user.TargetDUPR}} ({{DUPRLabel(user.TargetDUPR)}})
-
-            Available drills:
-            {{drillList}}
-
-            Select drills that fit within {{durationMinutes}} minutes total. Include warmup and cooldown time. Prioritize variety across categories. For each chosen drill, provide level-specific coaching notes relevant to a DUPR {{user.CurrentDUPR}} player working toward DUPR {{user.TargetDUPR}}.
-
-            Respond with ONLY a valid JSON object matching this exact schema — no markdown, no explanation:
-            {
-              "drills": [
-                {
-                  "title": "string",
-                  "category": "string",
-                  "durationMinutes": 10,
-                  "coachingNotes": "string"
-                }
-              ],
-              "totalDuration": {{durationMinutes}},
-              "warmup": "string",
-              "cooldown": "string",
-              "coachingNotes": "string"
-            }
-            """;
-
-        var requestBody = new
-        {
-            model = "claude-sonnet-4-6",
-            max_tokens = 2000,
-            system = "You are an expert pickleball coach who creates structured, practical workout plans. Always respond with valid JSON matching the requested schema exactly — no markdown fences, no extra text.",
-            messages = new[]
-            {
-                new { role = "user", content = userPrompt }
-            }
-        };
-
-        var httpClient = _httpClientFactory.CreateClient("anthropic");
-        var json = JsonSerializer.Serialize(requestBody);
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
-        content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-        httpClient.DefaultRequestHeaders.Remove("x-api-key");
-        httpClient.DefaultRequestHeaders.Add("x-api-key", apiKey);
-
-        var response = await httpClient.PostAsync("v1/messages", content);
-        var responseJson = await response.Content.ReadAsStringAsync();
-
-        if (!response.IsSuccessStatusCode)
-            throw new WorkoutGenerationException(responseJson);
-
-        using var doc = JsonDocument.Parse(responseJson);
-        var textContent = doc.RootElement
-            .GetProperty("content")[0]
-            .GetProperty("text")
-            .GetString() ?? "";
-
-        var strippedText = textContent.Trim();
-        if (strippedText.StartsWith("```"))
-        {
-            var firstNewline = strippedText.IndexOf('\n');
-            var lastFence = strippedText.LastIndexOf("```");
-            if (firstNewline >= 0 && lastFence > firstNewline)
-                strippedText = strippedText[(firstNewline + 1)..lastFence].Trim();
-        }
-
-        try
-        {
-            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            var workoutPlan = JsonSerializer.Deserialize<WorkoutPlanResponse>(strippedText, options);
-            if (workoutPlan == null)
-                throw new WorkoutDeserializationException("AI returned a null response.", textContent);
-            return workoutPlan;
-        }
-        catch (WorkoutDeserializationException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            throw new WorkoutDeserializationException($"Failed to parse AI response: {ex.Message}", textContent);
-        }
-    }
-
-    private static string DUPRLabel(decimal dupr) => dupr switch
-    {
-        <= 3.0m => "Beginner",
-        <= 3.5m => "Intermediate",
-        <= 4.0m => "Advanced",
-        _ => "Professional"
-    };
-}
-
-public class WorkoutGenerationException : Exception
-{
-    public WorkoutGenerationException(string message) : base(message) { }
-}
-
-public class WorkoutDeserializationException : Exception
-{
-    public string RawResponse { get; }
-    public WorkoutDeserializationException(string message, string rawResponse) : base(message)
-    {
-        RawResponse = rawResponse;
     }
 }
 

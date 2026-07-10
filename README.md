@@ -1,6 +1,6 @@
 # Pickleball Training Genie
 
-Pickleball Training Genie scrapes the internet for pickleball training drills, categorizes them by DUPR skill level, and uses an LLM to generate personalized drilling workouts. A user sets their DUPR rating and available training time; the application produces a level-appropriate workout plan powered by Claude AI.
+Pickleball Training Genie scrapes the internet for pickleball training drills, categorizes them by DUPR skill level, and uses an LLM to generate personalized drilling workouts. A user sets their DUPR rating and available training time; the application produces a level-appropriate workout plan powered by an LLM hosted on DeepInfra.
 
 ## Core Concept
 
@@ -14,7 +14,7 @@ Pickleball Training Genie scrapes the internet for pickleball training drills, c
 
 2. **User Profile** — Users register with their current DUPR and target DUPR, plus an optional preferred session duration.
 
-3. **AI Workout Generation** — `POST /api/workouts/generate` queries drills matching the user's DUPR range, sends them to Claude, and returns a structured workout plan (drill sequence, per-drill coaching notes, warmup, cooldown).
+3. **AI Workout Generation** — `POST /api/workouts/generate` queries drills matching the user's DUPR range, sends them to the LLM, and returns a structured workout plan (drill sequence, per-drill coaching notes, warmup, cooldown).
 
 ## Repository layout
 
@@ -47,7 +47,7 @@ Pickleball Training Genie scrapes the internet for pickleball training drills, c
 
 | Variable | Description |
 |---|---|
-| `ANTHROPIC_API_KEY` | Required for workout generation via Claude |
+| `DEEPINFRA_API_KEY` | Required for workout generation via DeepInfra |
 | `JWT_SECRET` | JWT signing secret (use a long random string in production) |
 | `DATABASE_URL` | PostgreSQL connection string (Railway `postgres://` format supported) |
 
@@ -96,4 +96,4 @@ swift test
 
 ## Deployment (Railway)
 
-The API parses Railway's `DATABASE_URL` (`postgresql://...` or `postgres://...`) into the correct Npgsql format and runs migrations on startup. Set `ANTHROPIC_API_KEY` and `JWT_SECRET` as Railway environment variables.
+The API parses Railway's `DATABASE_URL` (`postgresql://...` or `postgres://...`) into the correct Npgsql format and runs migrations on startup. Set `DEEPINFRA_API_KEY` and `JWT_SECRET` as Railway environment variables.

@@ -55,10 +55,10 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddAuthorization();
 builder.Services.AddControllers();
 
-builder.Services.AddHttpClient("anthropic", client =>
+builder.Services.AddHttpClient<IWorkoutLlmService, DeepInfraWorkoutLlmService>(client =>
 {
-    client.BaseAddress = new Uri("https://api.anthropic.com/");
-    client.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
+    var baseUrl = builder.Configuration["DeepInfra:BaseUrl"] ?? "https://api.deepinfra.com/";
+    client.BaseAddress = new Uri(baseUrl);
 });
 
 builder.Services.AddHttpClient<IDuprService, DuprService>(client =>

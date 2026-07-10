@@ -60,7 +60,7 @@ cd src/PickleballGenie.Scraper && dotnet run
 
 **Auth:** JWT bearer tokens issued by `POST /api/Users/login`. Most controller actions are `[Authorize]`; public endpoints are decorated `[AllowAnonymous]`. The token embeds `ClaimTypes.NameIdentifier` (user GUID) and `CurrentDUPR`.
 
-**LLM Workout Generation:** `POST /api/workouts/generate` queries drills matching the user's DUPR range and sends them to Claude (Anthropic API `claude-sonnet-4-6`). The prompt is built inside `GenerateWithClaude` in `WorkoutsController.cs`.
+**LLM Workout Generation:** `POST /api/workouts/generate` queries drills matching the user's DUPR range and sends them to a DeepInfra-hosted model (`deepseek-ai/DeepSeek-V3` by default, via DeepInfra's OpenAI-compatible API). The prompt is built inside `DeepInfraWorkoutLlmService` in `src/PickleballGenie.Api/Services/WorkoutLlmService.cs`; requires `DEEPINFRA_API_KEY`.
 
 **Recommendation logic:** `GET /api/Drills/recommendations` returns drills where `TargetDUPRLevel` falls within `[user.CurrentDUPR, user.TargetDUPR]`.
 
