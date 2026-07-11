@@ -1,9 +1,12 @@
 {
   "version": 2,
-  "dgSpecHash": "r9B+dvtx0CI=",
+  "dgSpecHash": "HHtglkKZPTw=",
   "success": true,
   "projectFilePath": "/Users/johndenman/Repos/pickleball-training-genie/src/PickleballGenie.Api/PickleballGenie.Api.csproj",
   "expectedPackageFiles": [
+    "/Users/johndenman/.nuget/packages/google.apis/1.69.0/google.apis.1.69.0.nupkg.sha512",
+    "/Users/johndenman/.nuget/packages/google.apis.auth/1.69.0/google.apis.auth.1.69.0.nupkg.sha512",
+    "/Users/johndenman/.nuget/packages/google.apis.core/1.69.0/google.apis.core.1.69.0.nupkg.sha512",
     "/Users/johndenman/.nuget/packages/humanizer.core/2.14.1/humanizer.core.2.14.1.nupkg.sha512",
     "/Users/johndenman/.nuget/packages/microsoft.aspnetcore.authentication.jwtbearer/10.0.8/microsoft.aspnetcore.authentication.jwtbearer.10.0.8.nupkg.sha512",
     "/Users/johndenman/.nuget/packages/microsoft.aspnetcore.identity.entityframeworkcore/10.0.8/microsoft.aspnetcore.identity.entityframeworkcore.10.0.8.nupkg.sha512",
@@ -38,14 +41,15 @@
     "/Users/johndenman/.nuget/packages/swashbuckle.aspnetcore.swagger/10.2.1/swashbuckle.aspnetcore.swagger.10.2.1.nupkg.sha512",
     "/Users/johndenman/.nuget/packages/swashbuckle.aspnetcore.swaggergen/10.2.1/swashbuckle.aspnetcore.swaggergen.10.2.1.nupkg.sha512",
     "/Users/johndenman/.nuget/packages/swashbuckle.aspnetcore.swaggerui/10.2.1/swashbuckle.aspnetcore.swaggerui.10.2.1.nupkg.sha512",
-    "/Users/johndenman/.nuget/packages/system.codedom/6.0.0/system.codedom.6.0.0.nupkg.sha512",
+    "/Users/johndenman/.nuget/packages/system.codedom/7.0.0/system.codedom.7.0.0.nupkg.sha512",
     "/Users/johndenman/.nuget/packages/system.composition/9.0.0/system.composition.9.0.0.nupkg.sha512",
     "/Users/johndenman/.nuget/packages/system.composition.attributedmodel/9.0.0/system.composition.attributedmodel.9.0.0.nupkg.sha512",
     "/Users/johndenman/.nuget/packages/system.composition.convention/9.0.0/system.composition.convention.9.0.0.nupkg.sha512",
     "/Users/johndenman/.nuget/packages/system.composition.hosting/9.0.0/system.composition.hosting.9.0.0.nupkg.sha512",
     "/Users/johndenman/.nuget/packages/system.composition.runtime/9.0.0/system.composition.runtime.9.0.0.nupkg.sha512",
     "/Users/johndenman/.nuget/packages/system.composition.typedparts/9.0.0/system.composition.typedparts.9.0.0.nupkg.sha512",
-    "/Users/johndenman/.nuget/packages/system.identitymodel.tokens.jwt/8.0.1/system.identitymodel.tokens.jwt.8.0.1.nupkg.sha512"
+    "/Users/johndenman/.nuget/packages/system.identitymodel.tokens.jwt/8.0.1/system.identitymodel.tokens.jwt.8.0.1.nupkg.sha512",
+    "/Users/johndenman/.nuget/packages/system.management/7.0.2/system.management.7.0.2.nupkg.sha512"
   ],
   "logs": []
 }

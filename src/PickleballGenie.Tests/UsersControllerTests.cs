@@ -57,6 +57,35 @@ public class UsersControllerTests
         return (userManager, context);
     }
 
+    private UsersController CreateController(
+        UserManager<User> userManager,
+        AppDbContext context,
+        FakeDuprService? duprService = null,
+        FakeGoogleTokenValidator? googleValidator = null,
+        FakeAppleTokenValidator? appleValidator = null)
+    {
+        return new UsersController(
+            userManager,
+            GetMockConfiguration(),
+            duprService ?? new FakeDuprService(),
+            context,
+            googleValidator ?? new FakeGoogleTokenValidator(),
+            appleValidator ?? new FakeAppleTokenValidator());
+    }
+
+    private static void AuthenticateAs(UsersController controller, Guid userId)
+    {
+        var claims = new ClaimsPrincipal(new ClaimsIdentity(new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, userId.ToString())
+        }, "mock"));
+
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = claims }
+        };
+    }
+
     private IConfiguration GetMockConfiguration()
     {
         var inMemorySettings = new Dictionary<string, string?> {
@@ -76,9 +105,8 @@ public class UsersControllerTests
     {
         // Arrange
         var (userManager, context) = GetUserManagerAndContext();
-        var config = GetMockConfiguration();
         var fakeDuprService = new FakeDuprService();
-        var controller = new UsersController(userManager, config, fakeDuprService);
+        var controller = CreateController(userManager, context, fakeDuprService);
 
         var request = new RegisterRequest
         {
@@ -106,9 +134,8 @@ public class UsersControllerTests
     {
         // Arrange
         var (userManager, context) = GetUserManagerAndContext();
-        var config = GetMockConfiguration();
         var fakeDuprService = new FakeDuprService();
-        var controller = new UsersController(userManager, config, fakeDuprService);
+        var controller = CreateController(userManager, context, fakeDuprService);
 
         var request = new RegisterRequest
         {
@@ -132,9 +159,8 @@ public class UsersControllerTests
     {
         // Arrange
         var (userManager, context) = GetUserManagerAndContext();
-        var config = GetMockConfiguration();
         var fakeDuprService = new FakeDuprService();
-        var controller = new UsersController(userManager, config, fakeDuprService);
+        var controller = CreateController(userManager, context, fakeDuprService);
 
         var request = new RegisterRequest
         {
@@ -158,9 +184,8 @@ public class UsersControllerTests
     {
         // Arrange
         var (userManager, context) = GetUserManagerAndContext();
-        var config = GetMockConfiguration();
         var fakeDuprService = new FakeDuprService();
-        var controller = new UsersController(userManager, config, fakeDuprService);
+        var controller = CreateController(userManager, context, fakeDuprService);
 
         var userId = Guid.NewGuid();
         var user = new User
@@ -211,9 +236,8 @@ public class UsersControllerTests
     {
         // Arrange
         var (userManager, context) = GetUserManagerAndContext();
-        var config = GetMockConfiguration();
         var fakeDuprService = new FakeDuprService();
-        var controller = new UsersController(userManager, config, fakeDuprService);
+        var controller = CreateController(userManager, context, fakeDuprService);
 
         var userId = Guid.NewGuid();
         var user = new User
@@ -257,9 +281,8 @@ public class UsersControllerTests
     {
         // Arrange
         var (userManager, context) = GetUserManagerAndContext();
-        var config = GetMockConfiguration();
         var fakeDuprService = new FakeDuprService();
-        var controller = new UsersController(userManager, config, fakeDuprService);
+        var controller = CreateController(userManager, context, fakeDuprService);
 
         fakeDuprService.ExchangeCallback = (code) => Task.FromResult(new DuprProfileDto
         {
@@ -290,9 +313,8 @@ public class UsersControllerTests
     {
         // Arrange
         var (userManager, context) = GetUserManagerAndContext();
-        var config = GetMockConfiguration();
         var fakeDuprService = new FakeDuprService();
-        var controller = new UsersController(userManager, config, fakeDuprService);
+        var controller = CreateController(userManager, context, fakeDuprService);
 
         var existingUser = new User
         {
@@ -327,6 +349,227 @@ public class UsersControllerTests
         Assert.Equal(4.10m, user.SinglesDUPR);
         Assert.Equal(4.15m, user.DoublesDUPR);
         Assert.Equal(4.00m, user.TargetDUPR); // Target DUPR is not overwritten for existing users
+    }
+
+    [Fact]
+    public async Task UpdateProfile_CompletesProfile_AndFlipsIsProfileComplete()
+    {
+        // Arrange
+        var (userManager, context) = GetUserManagerAndContext();
+        var fakeDuprService = new FakeDuprService();
+        var controller = CreateController(userManager, context, fakeDuprService);
+
+        var userId = Guid.NewGuid();
+        var user = new User
+        {
+            Id = userId,
+            UserName = "onboard@example.com",
+            Email = "onboard@example.com"
+        };
+        await userManager.CreateAsync(user, "SecurePassword123!");
+        AuthenticateAs(controller, userId);
+
+        var request = new UpdateProfileRequest
+        {
+            FirstName = "Sam",
+            LastName = "Player",
+            ZipCode = "75201",
+            HomeCityId = 12,
+            HomeCityName = "Dallas, TX",
+            DominantHand = "Right",
+            YearsPlaying = 3,
+            PreferredPlayStyle = "Doubles",
+            AvatarId = "builtin:paddle",
+            SinglesDUPR = 3.5m,
+            DoublesDUPR = 4.0m,
+            TargetDUPR = 4.5m,
+            PreferredSessionDurationMinutes = 45
+        };
+
+        // Act
+        var result = await controller.UpdateProfile(request);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<UserResponse>(okResult.Value);
+        Assert.Equal("Sam", response.FirstName);
+        Assert.Equal("Player", response.LastName);
+        Assert.Equal("75201", response.ZipCode);
+        Assert.Equal(12, response.HomeCityId);
+        Assert.Equal("Dallas, TX", response.HomeCityName);
+        Assert.Equal("right", response.DominantHand);
+        Assert.Equal("doubles", response.PreferredPlayStyle);
+        Assert.Equal("builtin:paddle", response.AvatarId);
+        Assert.True(response.IsProfileComplete);
+        Assert.False(response.HasCustomAvatar);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_RejectsInvalidZipCode()
+    {
+        // Arrange
+        var (userManager, context) = GetUserManagerAndContext();
+        var fakeDuprService = new FakeDuprService();
+        var controller = CreateController(userManager, context, fakeDuprService);
+
+        var userId = Guid.NewGuid();
+        var user = new User
+        {
+            Id = userId,
+            UserName = "zip@example.com",
+            Email = "zip@example.com"
+        };
+        await userManager.CreateAsync(user, "SecurePassword123!");
+        AuthenticateAs(controller, userId);
+
+        // Act
+        var result = await controller.UpdateProfile(new UpdateProfileRequest { ZipCode = "1234" });
+
+        // Assert
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Contains("Zip code", badRequest.Value?.ToString() ?? "");
+    }
+
+    [Fact]
+    public async Task UpdateProfile_RejectsTargetBelowCurrentDUPR()
+    {
+        // Arrange
+        var (userManager, context) = GetUserManagerAndContext();
+        var fakeDuprService = new FakeDuprService();
+        var controller = CreateController(userManager, context, fakeDuprService);
+
+        var userId = Guid.NewGuid();
+        var user = new User
+        {
+            Id = userId,
+            UserName = "target@example.com",
+            Email = "target@example.com"
+        };
+        await userManager.CreateAsync(user, "SecurePassword123!");
+        AuthenticateAs(controller, userId);
+
+        // Act
+        var result = await controller.UpdateProfile(new UpdateProfileRequest
+        {
+            SinglesDUPR = 4.0m,
+            DoublesDUPR = 4.0m,
+            TargetDUPR = 3.5m
+        });
+
+        // Assert
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task GoogleLogin_NewUser_CreatesUserWithIncompleteProfile()
+    {
+        // Arrange
+        var (userManager, context) = GetUserManagerAndContext();
+        var googleValidator = new FakeGoogleTokenValidator
+        {
+            Result = new SocialUserInfo
+            {
+                Subject = "google-sub-123",
+                Email = "google_user@example.com",
+                FirstName = "Gina",
+                LastName = "Google"
+            }
+        };
+        var controller = CreateController(userManager, context, googleValidator: googleValidator);
+
+        // Act
+        var result = await controller.GoogleLogin(new GoogleLoginRequest { IdToken = "fake-token" });
+
+        // Assert
+        Assert.IsType<OkObjectResult>(result);
+        var user = await userManager.FindByEmailAsync("google_user@example.com");
+        Assert.NotNull(user);
+        Assert.Equal("Gina", user.FirstName);
+        Assert.Equal("Google", user.LastName);
+        Assert.False(user.IsProfileComplete);
+
+        var logins = await userManager.GetLoginsAsync(user);
+        Assert.Contains(logins, l => l.LoginProvider == "Google" && l.ProviderKey == "google-sub-123");
+    }
+
+    [Fact]
+    public async Task GoogleLogin_ExistingEmailUser_LinksLoginInsteadOfDuplicating()
+    {
+        // Arrange
+        var (userManager, context) = GetUserManagerAndContext();
+        var existing = new User
+        {
+            UserName = "linked@example.com",
+            Email = "linked@example.com",
+            SinglesDUPR = 3.5m,
+            DoublesDUPR = 3.5m,
+            TargetDUPR = 4.0m
+        };
+        await userManager.CreateAsync(existing, "SecurePassword123!");
+
+        var googleValidator = new FakeGoogleTokenValidator
+        {
+            Result = new SocialUserInfo
+            {
+                Subject = "google-sub-456",
+                Email = "linked@example.com",
+                FirstName = "Lin",
+                LastName = "Ked"
+            }
+        };
+        var controller = CreateController(userManager, context, googleValidator: googleValidator);
+
+        // Act — twice, second call exercises the FindByLoginAsync fast path
+        var first = await controller.GoogleLogin(new GoogleLoginRequest { IdToken = "fake-token" });
+        var second = await controller.GoogleLogin(new GoogleLoginRequest { IdToken = "fake-token" });
+
+        // Assert
+        Assert.IsType<OkObjectResult>(first);
+        Assert.IsType<OkObjectResult>(second);
+        Assert.Single(userManager.Users.Where(u => u.Email == "linked@example.com"));
+
+        var user = await userManager.FindByEmailAsync("linked@example.com");
+        Assert.NotNull(user);
+        Assert.Equal("Lin", user.FirstName); // name backfilled from Google
+        Assert.Equal(3.5m, user.SinglesDUPR); // existing data untouched
+    }
+
+    [Fact]
+    public async Task AppleLogin_InvalidToken_ReturnsUnauthorized()
+    {
+        // Arrange
+        var (userManager, context) = GetUserManagerAndContext();
+        var controller = CreateController(userManager, context, appleValidator: new FakeAppleTokenValidator());
+
+        // Act
+        var result = await controller.AppleLogin(new AppleLoginRequest { IdentityToken = "garbage" });
+
+        // Assert
+        Assert.IsType<UnauthorizedObjectResult>(result);
+    }
+}
+
+public class FakeGoogleTokenValidator : IGoogleTokenValidator
+{
+    public SocialUserInfo? Result { get; set; }
+
+    public Task<SocialUserInfo> ValidateAsync(string idToken)
+    {
+        if (Result == null)
+            throw new SocialTokenValidationException("Invalid Google ID token.");
+        return Task.FromResult(Result);
+    }
+}
+
+public class FakeAppleTokenValidator : IAppleTokenValidator
+{
+    public SocialUserInfo? Result { get; set; }
+
+    public Task<SocialUserInfo> ValidateAsync(string identityToken)
+    {
+        if (Result == null)
+            throw new SocialTokenValidationException("Invalid Apple identity token.");
+        return Task.FromResult(Result);
     }
 }
 

@@ -57,6 +57,30 @@ public class DrillsController : ControllerBase
         return Ok(recommendedDrills);
     }
 
+    [HttpGet("progress")]
+    public async Task<IActionResult> GetProgress()
+    {
+        var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userIdStr) || !Guid.TryParse(userIdStr, out var userId))
+            return Unauthorized();
+
+        var items = await _context.UserDrillProgresses
+            .Where(p => p.UserId == userId)
+            .Include(p => p.Drill)
+            .OrderByDescending(p => p.CompletedAt)
+            .Select(p => new
+            {
+                DrillId = p.DrillId.ToString(),
+                Title = p.Drill.Title,
+                Category = p.Drill.Category,
+                Status = p.Status.ToString(),
+                CompletedAt = p.CompletedAt
+            })
+            .ToListAsync();
+
+        return Ok(items);
+    }
+
     [HttpPost("{id}/complete")]
     public async Task<IActionResult> CompleteDrill(Guid id)
     {

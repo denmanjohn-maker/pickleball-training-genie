@@ -66,6 +66,9 @@ builder.Services.AddHttpClient<IDuprService, DuprService>(client =>
     var baseUrl = builder.Configuration["Dupr:BaseUrl"] ?? "https://api.dupr.com/";
     client.BaseAddress = new Uri(baseUrl);
 });
+
+builder.Services.AddSingleton<IGoogleTokenValidator, GoogleTokenValidator>();
+builder.Services.AddHttpClient<IAppleTokenValidator, AppleTokenValidator>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {

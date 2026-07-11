@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PickleballGenie.Api.Services;
 using PickleballGenie.Data;
+using PickleballGenie.Models;
 using System.Security.Claims;
 using System.Text.Json.Serialization;
 
@@ -79,6 +80,141 @@ public class WorkoutsController : ControllerBase
             return StatusCode(502, new { error = "AI returned a response that could not be parsed.", details = ex.Message, rawResponse = ex.RawResponse });
         }
     }
+
+    /// <summary>
+    /// Records a completed workout session (a snapshot of the generated plan plus
+    /// which drills the user actually finished).
+    /// </summary>
+    [HttpPost("sessions")]
+    public async Task<IActionResult> CompleteSession([FromBody] CompleteWorkoutSessionRequest request)
+    {
+        var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userIdStr) || !Guid.TryParse(userIdStr, out var userId))
+            return Unauthorized();
+
+        if (request.Drills == null || request.Drills.Count == 0)
+            return BadRequest(new { Message = "A workout session must contain at least one drill." });
+
+        var session = new WorkoutSession
+        {
+            UserId = userId,
+            CompletedAt = DateTime.UtcNow,
+            DurationMinutes = request.DurationMinutes,
+            Warmup = request.Warmup,
+            Cooldown = request.Cooldown,
+            Drills = request.Drills.Select((d, index) => new WorkoutSessionDrill
+            {
+                SortOrder = index,
+                Title = d.Title,
+                Category = d.Category,
+                DurationMinutes = d.DurationMinutes,
+                CoachingNotes = d.CoachingNotes,
+                IsCompleted = d.IsCompleted
+            }).ToList()
+        };
+
+        _context.WorkoutSessions.Add(session);
+        await _context.SaveChangesAsync();
+
+        return CreatedAtAction(nameof(GetSessions), null, ToSessionResponse(session));
+    }
+
+    /// <summary>
+    /// Returns the authenticated user's workout session history, newest first.
+    /// </summary>
+    [HttpGet("sessions")]
+    public async Task<IActionResult> GetSessions([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    {
+        var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userIdStr) || !Guid.TryParse(userIdStr, out var userId))
+            return Unauthorized();
+
+        page = Math.Max(page, 1);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        var query = _context.WorkoutSessions
+            .Where(s => s.UserId == userId);
+
+        var totalCount = await query.CountAsync();
+
+        var sessions = await query
+            .Include(s => s.Drills)
+            .OrderByDescending(s => s.CompletedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return Ok(new WorkoutSessionListResponse
+        {
+            Items = sessions.Select(ToSessionResponse).ToList(),
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize
+        });
+    }
+
+    private static WorkoutSessionResponse ToSessionResponse(WorkoutSession session) => new()
+    {
+        Id = session.Id.ToString(),
+        CompletedAt = session.CompletedAt,
+        DurationMinutes = session.DurationMinutes,
+        Warmup = session.Warmup,
+        Cooldown = session.Cooldown,
+        Drills = session.Drills
+            .OrderBy(d => d.SortOrder)
+            .Select(d => new WorkoutSessionDrillResponse
+            {
+                Title = d.Title,
+                Category = d.Category,
+                DurationMinutes = d.DurationMinutes,
+                CoachingNotes = d.CoachingNotes,
+                IsCompleted = d.IsCompleted
+            }).ToList()
+    };
+}
+
+public class CompleteWorkoutSessionRequest
+{
+    public int DurationMinutes { get; set; }
+    public string? Warmup { get; set; }
+    public string? Cooldown { get; set; }
+    public List<CompleteWorkoutSessionDrill> Drills { get; set; } = new();
+}
+
+public class CompleteWorkoutSessionDrill
+{
+    public string Title { get; set; } = string.Empty;
+    public string Category { get; set; } = string.Empty;
+    public int DurationMinutes { get; set; }
+    public string? CoachingNotes { get; set; }
+    public bool IsCompleted { get; set; }
+}
+
+public class WorkoutSessionResponse
+{
+    public string Id { get; set; } = string.Empty;
+    public DateTime CompletedAt { get; set; }
+    public int DurationMinutes { get; set; }
+    public string? Warmup { get; set; }
+    public string? Cooldown { get; set; }
+    public List<WorkoutSessionDrillResponse> Drills { get; set; } = new();
+}
+
+public class WorkoutSessionDrillResponse
+{
+    public string Title { get; set; } = string.Empty;
+    public string Category { get; set; } = string.Empty;
+    public int DurationMinutes { get; set; }
+    public string? CoachingNotes { get; set; }
+    public bool IsCompleted { get; set; }
+}
+
+public class WorkoutSessionListResponse
+{
+    public List<WorkoutSessionResponse> Items { get; set; } = new();
+    public int TotalCount { get; set; }
+    public int Page { get; set; }
+    public int PageSize { get; set; }
 }
 
 public class GenerateWorkoutRequest

@@ -200,12 +200,18 @@ namespace PickleballGenie.Data.Migrations
                     b.Property<int>("AccessFailedCount")
                         .HasColumnType("integer");
 
+                    b.Property<string>("AvatarId")
+                        .HasColumnType("text");
+
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DominantHand")
+                        .HasColumnType("text");
 
                     b.Property<decimal?>("DoublesDUPR")
                         .HasColumnType("numeric");
@@ -220,8 +226,20 @@ namespace PickleballGenie.Data.Migrations
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("FirstName")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("HomeCityId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("HomeCityName")
+                        .HasColumnType("text");
+
                     b.Property<bool>("IsDuprLinked")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("LastName")
+                        .HasColumnType("text");
 
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("boolean");
@@ -246,6 +264,9 @@ namespace PickleballGenie.Data.Migrations
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("PreferredPlayStyle")
+                        .HasColumnType("text");
+
                     b.Property<int?>("PreferredSessionDurationMinutes")
                         .HasColumnType("integer");
 
@@ -265,6 +286,12 @@ namespace PickleballGenie.Data.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<int?>("YearsPlaying")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ZipCode")
+                        .HasColumnType("text");
+
                     b.HasKey("Id");
 
                     b.HasIndex("NormalizedEmail")
@@ -275,6 +302,27 @@ namespace PickleballGenie.Data.Migrations
                         .HasDatabaseName("UserNameIndex");
 
                     b.ToTable("AspNetUsers", (string)null);
+                });
+
+            modelBuilder.Entity("PickleballGenie.Models.UserAvatarImage", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<byte[]>("Data")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("UserAvatarImages");
                 });
 
             modelBuilder.Entity("PickleballGenie.Models.UserDrillProgress", b =>
@@ -302,6 +350,70 @@ namespace PickleballGenie.Data.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("UserDrillProgresses");
+                });
+
+            modelBuilder.Entity("PickleballGenie.Models.WorkoutSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Cooldown")
+                        .HasColumnType("text");
+
+                    b.Property<int>("DurationMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Warmup")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "CompletedAt");
+
+                    b.ToTable("WorkoutSessions");
+                });
+
+            modelBuilder.Entity("PickleballGenie.Models.WorkoutSessionDrill", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("CoachingNotes")
+                        .HasColumnType("text");
+
+                    b.Property<int>("DurationMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsCompleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("WorkoutSessionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkoutSessionId");
+
+                    b.ToTable("WorkoutSessionDrills");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
@@ -355,6 +467,17 @@ namespace PickleballGenie.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("PickleballGenie.Models.UserAvatarImage", b =>
+                {
+                    b.HasOne("PickleballGenie.Models.User", "User")
+                        .WithOne()
+                        .HasForeignKey("PickleballGenie.Models.UserAvatarImage", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("PickleballGenie.Models.UserDrillProgress", b =>
                 {
                     b.HasOne("PickleballGenie.Models.Drill", "Drill")
@@ -374,6 +497,28 @@ namespace PickleballGenie.Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("PickleballGenie.Models.WorkoutSession", b =>
+                {
+                    b.HasOne("PickleballGenie.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("PickleballGenie.Models.WorkoutSessionDrill", b =>
+                {
+                    b.HasOne("PickleballGenie.Models.WorkoutSession", "WorkoutSession")
+                        .WithMany("Drills")
+                        .HasForeignKey("WorkoutSessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("WorkoutSession");
+                });
+
             modelBuilder.Entity("PickleballGenie.Models.Drill", b =>
                 {
                     b.Navigation("UserProgresses");
@@ -382,6 +527,11 @@ namespace PickleballGenie.Data.Migrations
             modelBuilder.Entity("PickleballGenie.Models.User", b =>
                 {
                     b.Navigation("DrillProgresses");
+                });
+
+            modelBuilder.Entity("PickleballGenie.Models.WorkoutSession", b =>
+                {
+                    b.Navigation("Drills");
                 });
 #pragma warning restore 612, 618
         }
