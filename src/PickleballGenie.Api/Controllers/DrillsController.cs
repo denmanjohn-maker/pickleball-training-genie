@@ -49,9 +49,14 @@ public class DrillsController : ControllerBase
         if (user == null)
             return NotFound("User not found");
 
+        var masteredDrillIds = _context.UserDrillProgresses
+            .Where(p => p.UserId == user.Id && p.Status == DrillStatus.Mastered)
+            .Select(p => p.DrillId);
+
         // Logic Example: Recommend drills designed for CurrentDUPR and CurrentDUPR + 0.5 (TargetDUPR approach)
         var recommendedDrills = await _context.Drills
             .Where(d => d.TargetDUPRLevel >= user.CurrentDUPR && d.TargetDUPRLevel <= user.TargetDUPR)
+            .Where(d => !masteredDrillIds.Contains(d.Id))
             .ToListAsync();
 
         return Ok(recommendedDrills);

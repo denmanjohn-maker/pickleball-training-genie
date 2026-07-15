@@ -258,6 +258,49 @@ public class WorkoutsControllerTests
     }
 
     [Fact]
+    public async Task GenerateWorkout_ExcludesMasteredDrillsFromPrompt()
+    {
+        var options = InMemoryOptions();
+        using var context = new AppDbContext(options);
+
+        var userId = Guid.NewGuid();
+        var user = new User { Id = userId, UserName = "u", Email = "u@t.com", SinglesDUPR = 3.0m, TargetDUPR = 3.5m };
+        context.Users.Add(user);
+
+        var masteredDrill = new Drill { Title = "Mastered Dink", TargetDUPRLevel = 3.0m, Category = "Dinking", EstimatedDurationMinutes = 10 };
+        var unmasteredDrill = new Drill { Title = "Fresh Volley", TargetDUPRLevel = 3.5m, Category = "Volleys", EstimatedDurationMinutes = 10 };
+        context.Drills.AddRange(masteredDrill, unmasteredDrill);
+        await context.SaveChangesAsync();
+
+        context.UserDrillProgresses.Add(new UserDrillProgress
+        {
+            UserId = userId,
+            DrillId = masteredDrill.Id,
+            Status = DrillStatus.Mastered,
+            CompletedAt = DateTime.UtcNow
+        });
+        await context.SaveChangesAsync();
+
+        var captured = "";
+        var handler = new CapturingHttpMessageHandler(async req =>
+        {
+            captured = req.Content != null ? await req.Content.ReadAsStringAsync() : "";
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(ValidLlmResponse("{\"drills\":[],\"totalDuration\":30,\"warmup\":\"\",\"cooldown\":\"\",\"coachingNotes\":\"\"}"), Encoding.UTF8, "application/json")
+            };
+        });
+
+        var controller = BuildController(context, user, handler);
+
+        var result = await controller.GenerateWorkout(new GenerateWorkoutRequest { DurationMinutes = 30 });
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.DoesNotContain("Mastered Dink", captured);
+        Assert.Contains("Fresh Volley", captured);
+    }
+
+    [Fact]
     public async Task GenerateWorkout_Returns502_WhenAIResponseCannotBeParsed()
     {
         var options = InMemoryOptions();
