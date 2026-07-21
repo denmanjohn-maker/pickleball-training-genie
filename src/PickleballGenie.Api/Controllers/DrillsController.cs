@@ -41,11 +41,11 @@ public class DrillsController : ControllerBase
     [HttpGet("recommendations")]
     public async Task<IActionResult> GetRecommendations()
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (string.IsNullOrEmpty(userId))
+        var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userIdStr) || !Guid.TryParse(userIdStr, out var userId))
             return Unauthorized();
 
-        var user = await _context.Users.FindAsync(Guid.Parse(userId));
+        var user = await _context.Users.FindAsync(userId);
         if (user == null)
             return NotFound("User not found");
 
