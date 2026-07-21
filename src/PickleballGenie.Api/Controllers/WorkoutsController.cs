@@ -48,8 +48,13 @@ public class WorkoutsController : ControllerBase
 
         durationMinutes = Math.Clamp(durationMinutes, 5, 180);
 
+        var masteredDrillIds = _context.UserDrillProgresses
+            .Where(p => p.UserId == userId && p.Status == DrillStatus.Mastered)
+            .Select(p => p.DrillId);
+
         var drills = await _context.Drills
             .Where(d => d.TargetDUPRLevel >= user.CurrentDUPR && d.TargetDUPRLevel <= user.TargetDUPR)
+            .Where(d => !masteredDrillIds.Contains(d.Id))
             .OrderBy(d => d.TargetDUPRLevel)
             .ThenBy(d => d.Category)
             .Take(20)

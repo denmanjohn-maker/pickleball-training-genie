@@ -67,4 +67,60 @@ public class DrillsControllerTests
         Assert.Contains(drills, d => d.Title == "Drill 3.0");
         Assert.Contains(drills, d => d.Title == "Drill 3.5");
     }
+
+    [Fact]
+    public async Task GetRecommendations_ExcludesMasteredDrills()
+    {
+        // Arrange
+        var options = GetInMemoryOptions();
+        using var context = new AppDbContext(options);
+
+        var userId = Guid.NewGuid();
+        var user = new User
+        {
+            Id = userId,
+            Email = "test@example.com",
+            UserName = "test@example.com",
+            SinglesDUPR = 3.0m,
+            TargetDUPR = 3.5m
+        };
+        context.Users.Add(user);
+
+        var masteredDrill = new Drill { Title = "Mastered Drill", TargetDUPRLevel = 3.0m };
+        var unmasteredDrill = new Drill { Title = "Unmastered Drill", TargetDUPRLevel = 3.5m };
+        context.Drills.AddRange(masteredDrill, unmasteredDrill);
+        await context.SaveChangesAsync();
+
+        context.UserDrillProgresses.Add(new UserDrillProgress
+        {
+            UserId = userId,
+            DrillId = masteredDrill.Id,
+            Status = DrillStatus.Mastered,
+            CompletedAt = DateTime.UtcNow
+        });
+        await context.SaveChangesAsync();
+
+        var controller = new DrillsController(context);
+
+        var userClaims = new ClaimsPrincipal(new ClaimsIdentity(new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, userId.ToString())
+        }, "mock"));
+
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = userClaims }
+        };
+
+        // Act
+        var result = await controller.GetRecommendations();
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var drills = Assert.IsAssignableFrom<IEnumerable<Drill>>(okResult.Value);
+
+        Assert.Single(drills);
+        Assert.Contains(drills, d => d.Title == "Unmastered Drill");
+        Assert.DoesNotContain(drills, d => d.Title == "Mastered Drill");
+    }
 }

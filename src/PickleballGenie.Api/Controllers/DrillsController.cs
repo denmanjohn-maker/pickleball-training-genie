@@ -41,17 +41,22 @@ public class DrillsController : ControllerBase
     [HttpGet("recommendations")]
     public async Task<IActionResult> GetRecommendations()
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (string.IsNullOrEmpty(userId))
+        var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userIdStr) || !Guid.TryParse(userIdStr, out var userId))
             return Unauthorized();
 
-        var user = await _context.Users.FindAsync(Guid.Parse(userId));
+        var user = await _context.Users.FindAsync(userId);
         if (user == null)
             return NotFound("User not found");
+
+        var masteredDrillIds = _context.UserDrillProgresses
+            .Where(p => p.UserId == user.Id && p.Status == DrillStatus.Mastered)
+            .Select(p => p.DrillId);
 
         // Logic Example: Recommend drills designed for CurrentDUPR and CurrentDUPR + 0.5 (TargetDUPR approach)
         var recommendedDrills = await _context.Drills
             .Where(d => d.TargetDUPRLevel >= user.CurrentDUPR && d.TargetDUPRLevel <= user.TargetDUPR)
+            .Where(d => !masteredDrillIds.Contains(d.Id))
             .ToListAsync();
 
         return Ok(recommendedDrills);
