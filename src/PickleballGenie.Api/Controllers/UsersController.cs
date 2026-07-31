@@ -194,6 +194,25 @@ public class UsersController : ControllerBase
         return Ok(await BuildUserResponseAsync(user));
     }
 
+    // Permanently deletes the authenticated user's account. Required by App Store
+    // Guideline 5.1.1(v) for apps that support account creation. Dependent rows
+    // (avatar, workout sessions/drills, drill progress, and Identity login/claim/token
+    // rows) are removed automatically via the ON DELETE CASCADE foreign keys.
+    [Authorize]
+    [HttpDelete("profile")]
+    public async Task<IActionResult> DeleteAccount()
+    {
+        var user = await GetAuthenticatedUserAsync();
+        if (user == null)
+            return Unauthorized();
+
+        var result = await _userManager.DeleteAsync(user);
+        if (!result.Succeeded)
+            return BadRequest(result.Errors);
+
+        return NoContent();
+    }
+
     [Authorize]
     [HttpPut("profile/ratings")]
     public async Task<IActionResult> UpdateRatings([FromBody] UpdateRatingsRequest request)
