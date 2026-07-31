@@ -547,6 +547,51 @@ public class UsersControllerTests
         // Assert
         Assert.IsType<UnauthorizedObjectResult>(result);
     }
+
+    [Fact]
+    public async Task DeleteAccount_RemovesUser_AndReturnsNoContent()
+    {
+        // Arrange
+        var (userManager, context) = GetUserManagerAndContext();
+        var controller = CreateController(userManager, context);
+
+        var userId = Guid.NewGuid();
+        var user = new User
+        {
+            Id = userId,
+            UserName = "delete_me@example.com",
+            Email = "delete_me@example.com",
+            TargetDUPR = 4.0m
+        };
+        await userManager.CreateAsync(user, "SecurePassword123!");
+        AuthenticateAs(controller, userId);
+
+        // Act
+        var result = await controller.DeleteAccount();
+
+        // Assert
+        Assert.IsType<NoContentResult>(result);
+        Assert.Null(await userManager.FindByIdAsync(userId.ToString()));
+    }
+
+    [Fact]
+    public async Task DeleteAccount_ReturnsUnauthorized_WhenNoAuthenticatedUser()
+    {
+        // Arrange
+        var (userManager, context) = GetUserManagerAndContext();
+        var controller = CreateController(userManager, context);
+        // No NameIdentifier claim -> no authenticated user.
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        // Act
+        var result = await controller.DeleteAccount();
+
+        // Assert
+        Assert.IsType<UnauthorizedResult>(result);
+    }
 }
 
 public class FakeGoogleTokenValidator : IGoogleTokenValidator
