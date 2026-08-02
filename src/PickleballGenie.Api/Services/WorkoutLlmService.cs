@@ -129,6 +129,8 @@ public class DeepInfraWorkoutLlmService : IWorkoutLlmService
 
     private static string DUPRLabel(decimal dupr) => dupr switch
     {
+        <= 2.0m => "New to the game",
+        <= 2.5m => "Advanced beginner",
         <= 3.0m => "Beginner",
         <= 3.5m => "Intermediate",
         <= 4.0m => "Advanced",

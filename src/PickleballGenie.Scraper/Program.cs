@@ -279,6 +279,35 @@ class Program
 
     static List<Drill> GetCuratedDrills() => new()
     {
+        // 2.0 — New to the game. Titles must match DbSeeder's curated list so
+        // the title-based dedupe below never double-inserts them.
+        new Drill { Title = "Serve 20 In a Row", Category = "Serving", TargetDUPRLevel = 2.0m, EstimatedDurationMinutes = 10,
+            Description = "Solo drill — all you need is a bucket of balls. From behind the baseline, serve into the correct service box 20 times in a row, using either a traditional underhand serve or the easier drop serve. Any depth counts; you're building a repeatable motion. Miss? Restart the count and track your best streak week to week.",
+            SourceUrl = "https://usapickleball.org/what-is-pickleball/how-to-play/basics/" },
+        new Drill { Title = "Wall Dink Touch", Category = "Dinking", TargetDUPRLevel = 2.0m, EstimatedDurationMinutes = 10,
+            Description = "Solo drill — any solid wall works. Mark a line at net height (34 inches). Stand about 7 feet back and softly dink above the line, letting the ball bounce between hits. Goal: 25 controlled dinks in a row. Soft grip, paddle out front, and bend your knees — not your wrist.",
+            SourceUrl = "https://usapickleball.org/what-is-pickleball/how-to-play/basics/" },
+        new Drill { Title = "Drop, Bounce, Hit", Category = "General", TargetDUPRLevel = 2.0m, EstimatedDurationMinutes = 10,
+            Description = "Solo drill for brand-new players. Drop the ball, let it bounce, and hit an easy forehand groundstroke across the court; collect and repeat, then switch to backhand. 20 each side. You're learning the paddle face, the contact point, and how the ball comes off the court — the foundation for everything else.",
+            SourceUrl = "https://usapickleball.org/what-is-pickleball/how-to-play/basics/" },
+        new Drill { Title = "Let It Bounce: Return Habits", Category = "Returns", TargetDUPRLevel = 2.0m, EstimatedDurationMinutes = 10,
+            Description = "With a partner feeding easy serves (or a ball rebounding off a wall), practice the two-bounce habit: let the serve bounce, return it, and call the bounce out loud. Ten returns from each side. This builds the rule into your reflexes before match play, where volleying the serve is the classic new-player fault.",
+            SourceUrl = "https://usapickleball.org/what-is-pickleball/how-to-play/basics/" },
+
+        // 2.5 — Advanced beginner
+        new Drill { Title = "Deep Serve Targets", Category = "Serving", TargetDUPRLevel = 2.5m, EstimatedDurationMinutes = 10,
+            Description = "Solo drill. Place a towel or cones across the back third of the service box. Serve 10 balls at each box, counting how many land deep past your marker. Goal: 7 of 10. A deep serve keeps the returner pinned back and buys you time — the first serve upgrade that wins points at this level.",
+            SourceUrl = "https://usapickleball.org/what-is-pickleball/how-to-play/basics/" },
+        new Drill { Title = "Wall Volley Control", Category = "Volleys", TargetDUPRLevel = 2.5m, EstimatedDurationMinutes = 10,
+            Description = "Solo drill. Stand 7–8 feet from a wall, paddle up in ready position, and volley continuously without letting the ball bounce. Start forehand-only, then alternate forehand and backhand. Goal: 25 in a row under control. Keep a short, compact punch — no backswing.",
+            SourceUrl = "https://usapickleball.org/what-is-pickleball/how-to-play/basics/" },
+        new Drill { Title = "Baseline to Kitchen Footwork", Category = "Movement", TargetDUPRLevel = 2.5m, EstimatedDurationMinutes = 10,
+            Description = "Solo drill. Start at the baseline, shadow a return, then advance toward the kitchen line in controlled steps with a split-step each time an imaginary opponent would strike the ball. Touch the line, backpedal to mid-court, split-step, and come forward again. 10 trips. Court movement is a skill — practice it like one.",
+            SourceUrl = "https://usapickleball.org/what-is-pickleball/how-to-play/basics/" },
+        new Drill { Title = "Cooperative Dink Rally to 20", Category = "Dinking", TargetDUPRLevel = 2.5m, EstimatedDurationMinutes = 10,
+            Description = "Partner drill. Both players at the kitchen line, dinking cross-court cooperatively — the goal is keeping the rally alive, not winning it. Count out loud to 20, then switch to the other diagonal. If a ball pops up high, catch it and restart. Height discipline now becomes attack prevention later.",
+            SourceUrl = "https://usapickleball.org/what-is-pickleball/how-to-play/basics/" },
+
         // 3.0 — Beginner
         new Drill { Title = "Cross-Court Dink Rally", Category = "Dinking", TargetDUPRLevel = 3.0m, EstimatedDurationMinutes = 10,
             Description = "Stand at the kitchen line and sustain a cross-court dinking rally with a partner. Focus on soft hands, a continental grip, and keeping the ball below net height. Rally for 50 consecutive dinks before moving to backhand side.",

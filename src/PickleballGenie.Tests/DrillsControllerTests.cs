@@ -69,6 +69,56 @@ public class DrillsControllerTests
     }
 
     [Fact]
+    public async Task GetRecommendations_ServesBeginnerTier_ForSub3Player()
+    {
+        // A 2.0 player targeting 2.5 gets the beginner-tier drills — the range
+        // filter must work below DUPR 3.0.
+        var options = GetInMemoryOptions();
+        using var context = new AppDbContext(options);
+
+        var userId = Guid.NewGuid();
+        context.Users.Add(new User
+        {
+            Id = userId,
+            Email = "newplayer@example.com",
+            UserName = "newplayer@example.com",
+            SinglesDUPR = 2.0m,
+            TargetDUPR = 2.5m
+        });
+
+        context.Drills.AddRange(
+            new Drill { Title = "Drill 2.0", TargetDUPRLevel = 2.0m },
+            new Drill { Title = "Drill 2.5", TargetDUPRLevel = 2.5m },
+            new Drill { Title = "Drill 3.0", TargetDUPRLevel = 3.0m }
+        );
+        await context.SaveChangesAsync();
+
+        var controller = new DrillsController(context);
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, userId.ToString())
+                }, "mock"))
+            }
+        };
+
+        // Act
+        var result = await controller.GetRecommendations();
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var drills = Assert.IsAssignableFrom<IEnumerable<Drill>>(okResult.Value);
+
+        Assert.Equal(2, drills.Count());
+        Assert.Contains(drills, d => d.Title == "Drill 2.0");
+        Assert.Contains(drills, d => d.Title == "Drill 2.5");
+        Assert.DoesNotContain(drills, d => d.Title == "Drill 3.0");
+    }
+
+    [Fact]
     public async Task GetRecommendations_ExcludesMasteredDrills()
     {
         // Arrange

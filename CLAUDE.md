@@ -48,16 +48,18 @@ The API and Scraper both call `MigrateAsync()` on startup, so migrations apply a
 
 ## DUPR Level System
 
-DUPR (Dynamic Universal Pickleball Rating) is the skill rating used throughout the app. The four target levels are:
+DUPR (Dynamic Universal Pickleball Rating) is the skill rating used throughout the app. The six target levels are:
 
 | DUPR | Label | Player Characteristics |
 |------|-------|------------------------|
+| 2.0 | New to the game | Learning to serve and return, still learning the rules |
+| 2.5 | Advanced beginner | Can sustain short rallies, knows the basic rules |
 | 3.0 | Beginner | Learning basic strokes, consistency, court positioning |
 | 3.5 | Intermediate | Developing third shot drop, kitchen game, transition zone |
 | 4.0 | Advanced | Competitive play, pattern recognition, speed-up/reset sequences |
 | 5.0 | Professional | Tournament-level, advanced tactics (ATP, Erne), match simulation |
 
-**Drills are tagged with a `TargetDUPRLevel`** (3.0, 3.5, 4.0, or 5.0). When generating workouts or recommendations, drills are filtered to those where `TargetDUPRLevel >= user.CurrentDUPR AND TargetDUPRLevel <= user.TargetDUPR`. This ensures users practice skills at and just above their current level — the optimal zone for improvement.
+**Drills are tagged with a `TargetDUPRLevel`** (2.0, 2.5, 3.0, 3.5, 4.0, or 5.0). The curated 2.0/2.5 drills are deliberately solo-friendly — players without access to coaching usually lack a drilling partner too. When generating workouts or recommendations, drills are filtered to those where `TargetDUPRLevel >= user.CurrentDUPR AND TargetDUPRLevel <= user.TargetDUPR`. This ensures users practice skills at and just above their current level — the optimal zone for improvement.
 
 **`User.CurrentDUPR` is a computed, `[NotMapped]` property**: `Math.Max(SinglesDUPR ?? 0, DoublesDUPR ?? 0)`. The stored columns are the nullable `SinglesDUPR` and `DoublesDUPR`. Keep DUPR values `decimal` in .NET and `Decimal` in Swift — never `double`/`float`.
 

@@ -7,6 +7,8 @@ Pickleball Training Genie scrapes the internet for pickleball training drills, c
 1. **Drill Database** — The scraper collects drills from pickleball sites and tags each with a DUPR level:
    | DUPR | Level |
    |------|-------|
+   | 2.0 | New to the game |
+   | 2.5 | Advanced beginner |
    | 3.0 | Beginner |
    | 3.5 | Intermediate |
    | 4.0 | Advanced |

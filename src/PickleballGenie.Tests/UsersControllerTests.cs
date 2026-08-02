@@ -130,6 +130,34 @@ public class UsersControllerTests
     }
 
     [Fact]
+    public async Task Register_WithBeginnerRatings_Succeeds()
+    {
+        // Regression guard for the 2.0/2.5 beginner tier: ratings below 3.0
+        // must be accepted end to end.
+        var (userManager, context) = GetUserManagerAndContext();
+        var controller = CreateController(userManager, context);
+
+        var request = new RegisterRequest
+        {
+            Email = "newplayer@example.com",
+            Password = "SecurePassword123!",
+            SinglesDUPR = 2.0m,
+            DoublesDUPR = 2.0m,
+            TargetDUPR = 2.5m
+        };
+
+        // Act
+        var result = await controller.Register(request);
+
+        // Assert
+        Assert.IsType<OkObjectResult>(result);
+        var user = await userManager.FindByEmailAsync("newplayer@example.com");
+        Assert.NotNull(user);
+        Assert.Equal(2.0m, user.SinglesDUPR);
+        Assert.Equal(2.5m, user.TargetDUPR);
+    }
+
+    [Fact]
     public async Task Register_WithTargetDUPR_LessThanSinglesDUPR_ReturnsBadRequest()
     {
         // Arrange
