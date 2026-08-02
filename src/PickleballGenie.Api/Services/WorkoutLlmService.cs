@@ -54,7 +54,7 @@ public class DeepInfraWorkoutLlmService : IWorkoutLlmService
         {
             var lines = string.Join("\n", recentCategoryRatings
                 .OrderBy(r => r.Value)
-                .Select(r => $"- {r.Key}: {r.Value:0.0}/5"));
+                .Select(r => $"- {r.Key}: {r.Value.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)}/5"));
             ratingsSection = $"""
 
                 The player's recent self-ratings by drill category (1 = struggled, 5 = nailed it):
