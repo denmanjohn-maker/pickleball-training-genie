@@ -8,7 +8,11 @@ namespace PickleballGenie.Api.Services;
 
 public interface IWorkoutLlmService
 {
-    Task<WorkoutPlanResponse> GeneratePlanAsync(User user, List<Drill> drills, int durationMinutes);
+    Task<WorkoutPlanResponse> GeneratePlanAsync(
+        User user,
+        List<Drill> drills,
+        int durationMinutes,
+        IReadOnlyDictionary<string, double>? recentCategoryRatings = null);
 }
 
 public class DeepInfraWorkoutLlmService : IWorkoutLlmService
@@ -26,7 +30,11 @@ public class DeepInfraWorkoutLlmService : IWorkoutLlmService
         _logger = logger;
     }
 
-    public async Task<WorkoutPlanResponse> GeneratePlanAsync(User user, List<Drill> drills, int durationMinutes)
+    public async Task<WorkoutPlanResponse> GeneratePlanAsync(
+        User user,
+        List<Drill> drills,
+        int durationMinutes,
+        IReadOnlyDictionary<string, double>? recentCategoryRatings = null)
     {
         var configKey = _configuration["DeepInfraApiKey"];
         var apiKey = !string.IsNullOrWhiteSpace(configKey)
@@ -39,6 +47,23 @@ public class DeepInfraWorkoutLlmService : IWorkoutLlmService
         var drillList = string.Join("\n", drills.Select((d, i) =>
             $"{i + 1}. [{d.Category}] \"{d.Title}\" (~{d.EstimatedDurationMinutes} min, DUPR {d.TargetDUPRLevel}): {d.Description}"));
 
+        // Post-session self-ratings (1 = struggled … 5 = nailed it), when the
+        // player has provided any — lets the plan lean into weak skills.
+        var ratingsSection = "";
+        if (recentCategoryRatings is { Count: > 0 })
+        {
+            var lines = string.Join("\n", recentCategoryRatings
+                .OrderBy(r => r.Value)
+                .Select(r => $"- {r.Key}: {r.Value:0.0}/5"));
+            ratingsSection = $"""
+
+                The player's recent self-ratings by drill category (1 = struggled, 5 = nailed it):
+                {lines}
+
+                Favor drills for the lowest-rated categories, and mention in the coaching notes when a drill targets a skill the player reported struggling with.
+                """;
+        }
+
         var userPrompt = $$"""
             Create a {{durationMinutes}}-minute pickleball drilling workout for a player with:
             - Current DUPR: {{user.CurrentDUPR}} ({{DUPRLabel(user.CurrentDUPR)}})
@@ -46,7 +71,7 @@ public class DeepInfraWorkoutLlmService : IWorkoutLlmService
 
             Available drills:
             {{drillList}}
-
+            {{ratingsSection}}
             Select drills that fit within {{durationMinutes}} minutes total. Include warmup and cooldown time. Prioritize variety across categories. For each chosen drill, provide level-specific coaching notes relevant to a DUPR {{user.CurrentDUPR}} player working toward DUPR {{user.TargetDUPR}}.
 
             Respond with ONLY a valid JSON object matching this exact schema — no markdown, no explanation:

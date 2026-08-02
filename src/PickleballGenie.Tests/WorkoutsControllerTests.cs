@@ -301,6 +301,110 @@ public class WorkoutsControllerTests
     }
 
     [Fact]
+    public async Task CompleteSession_PersistsSelfRatingsAndNotes()
+    {
+        var options = InMemoryOptions();
+        using var context = new AppDbContext(options);
+
+        var userId = Guid.NewGuid();
+        var user = new User { Id = userId, UserName = "u", Email = "u@t.com", SinglesDUPR = 3.0m, TargetDUPR = 3.5m };
+        context.Users.Add(user);
+        await context.SaveChangesAsync();
+
+        var controller = BuildController(context, user, new HttpResponseMessage(HttpStatusCode.OK));
+
+        var request = new CompleteWorkoutSessionRequest
+        {
+            DurationMinutes = 30,
+            Notes = "  Backhand dinks felt better today.  ",
+            Drills = new List<CompleteWorkoutSessionDrill>
+            {
+                new() { Title = "Dink Ladder", Category = "Dinking", DurationMinutes = 10, IsCompleted = true, SelfRating = 2 },
+                new() { Title = "Serve Targets", Category = "Serving", DurationMinutes = 10, IsCompleted = true, SelfRating = null }
+            }
+        };
+
+        var result = await controller.CompleteSession(request);
+
+        var created = Assert.IsType<CreatedAtActionResult>(result);
+        var response = Assert.IsType<WorkoutSessionResponse>(created.Value);
+        Assert.Equal("Backhand dinks felt better today.", response.Notes);
+        Assert.Equal(2, response.Drills[0].SelfRating);
+        Assert.Null(response.Drills[1].SelfRating);
+
+        var stored = await context.WorkoutSessionDrills.FirstAsync(d => d.Title == "Dink Ladder");
+        Assert.Equal(2, stored.SelfRating);
+    }
+
+    [Fact]
+    public async Task CompleteSession_RejectsOutOfRangeSelfRating()
+    {
+        var options = InMemoryOptions();
+        using var context = new AppDbContext(options);
+
+        var userId = Guid.NewGuid();
+        var user = new User { Id = userId, UserName = "u", Email = "u@t.com", SinglesDUPR = 3.0m, TargetDUPR = 3.5m };
+        context.Users.Add(user);
+        await context.SaveChangesAsync();
+
+        var controller = BuildController(context, user, new HttpResponseMessage(HttpStatusCode.OK));
+
+        var request = new CompleteWorkoutSessionRequest
+        {
+            DurationMinutes = 30,
+            Drills = new List<CompleteWorkoutSessionDrill>
+            {
+                new() { Title = "Dink Ladder", Category = "Dinking", DurationMinutes = 10, IsCompleted = true, SelfRating = 6 }
+            }
+        };
+
+        var result = await controller.CompleteSession(request);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task GenerateWorkout_IncludesRecentSelfRatingsInPrompt()
+    {
+        var options = InMemoryOptions();
+        using var context = new AppDbContext(options);
+
+        var userId = Guid.NewGuid();
+        var user = new User { Id = userId, UserName = "u", Email = "u@t.com", SinglesDUPR = 3.0m, TargetDUPR = 3.5m };
+        context.Users.Add(user);
+        context.Drills.Add(new Drill { Title = "Dink Drill", TargetDUPRLevel = 3.0m, Category = "Dinking", EstimatedDurationMinutes = 10 });
+        context.WorkoutSessions.Add(new WorkoutSession
+        {
+            UserId = userId,
+            CompletedAt = DateTime.UtcNow.AddDays(-1),
+            DurationMinutes = 30,
+            Drills = new List<WorkoutSessionDrill>
+            {
+                new() { SortOrder = 0, Title = "Old Dinks", Category = "Dinking", DurationMinutes = 10, IsCompleted = true, SelfRating = 1 }
+            }
+        });
+        await context.SaveChangesAsync();
+
+        var captured = "";
+        var handler = new CapturingHttpMessageHandler(async req =>
+        {
+            captured = req.Content != null ? await req.Content.ReadAsStringAsync() : "";
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(ValidLlmResponse("{\"drills\":[],\"totalDuration\":30,\"warmup\":\"\",\"cooldown\":\"\",\"coachingNotes\":\"\"}"), Encoding.UTF8, "application/json")
+            };
+        });
+
+        var controller = BuildController(context, user, handler);
+
+        var result = await controller.GenerateWorkout(new GenerateWorkoutRequest { DurationMinutes = 30 });
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Contains("self-ratings", captured);
+        Assert.Contains("Dinking: 1.0/5", captured);
+    }
+
+    [Fact]
     public async Task GenerateWorkout_Returns502_WhenAIResponseCannotBeParsed()
     {
         var options = InMemoryOptions();

@@ -63,9 +63,22 @@ public class WorkoutsController : ControllerBase
         if (!drills.Any())
             return BadRequest("No drills found for your DUPR range. Please run the scraper to populate the drill database.");
 
+        // Close the feedback loop: average the player's recent per-category
+        // self-ratings so the LLM leans into skills they reported struggling
+        // with. Sessions without ratings contribute nothing.
+        var recentRatings = await _context.WorkoutSessions
+            .Where(s => s.UserId == userId)
+            .OrderByDescending(s => s.CompletedAt)
+            .Take(10)
+            .SelectMany(s => s.Drills)
+            .Where(d => d.SelfRating != null)
+            .GroupBy(d => d.Category)
+            .Select(g => new { Category = g.Key, Average = g.Average(d => (double)d.SelfRating!) })
+            .ToDictionaryAsync(x => x.Category, x => x.Average);
+
         try
         {
-            var workoutPlan = await _llmService.GeneratePlanAsync(user, drills, durationMinutes);
+            var workoutPlan = await _llmService.GeneratePlanAsync(user, drills, durationMinutes, recentRatings);
             return Ok(workoutPlan);
         }
         catch (WorkoutConfigurationException ex)
@@ -100,6 +113,13 @@ public class WorkoutsController : ControllerBase
         if (request.Drills == null || request.Drills.Count == 0)
             return BadRequest(new { Message = "A workout session must contain at least one drill." });
 
+        if (request.Drills.Any(d => d.SelfRating is < 1 or > 5))
+            return BadRequest(new { Message = "SelfRating must be between 1 and 5." });
+
+        var notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim();
+        if (notes is { Length: > 2000 })
+            return BadRequest(new { Message = "Notes must be 2000 characters or fewer." });
+
         var session = new WorkoutSession
         {
             UserId = userId,
@@ -107,6 +127,7 @@ public class WorkoutsController : ControllerBase
             DurationMinutes = request.DurationMinutes,
             Warmup = request.Warmup,
             Cooldown = request.Cooldown,
+            Notes = notes,
             Drills = request.Drills.Select((d, index) => new WorkoutSessionDrill
             {
                 SortOrder = index,
@@ -114,7 +135,8 @@ public class WorkoutsController : ControllerBase
                 Category = d.Category,
                 DurationMinutes = d.DurationMinutes,
                 CoachingNotes = d.CoachingNotes,
-                IsCompleted = d.IsCompleted
+                IsCompleted = d.IsCompleted,
+                SelfRating = d.SelfRating
             }).ToList()
         };
 
@@ -165,6 +187,7 @@ public class WorkoutsController : ControllerBase
         DurationMinutes = session.DurationMinutes,
         Warmup = session.Warmup,
         Cooldown = session.Cooldown,
+        Notes = session.Notes,
         Drills = session.Drills
             .OrderBy(d => d.SortOrder)
             .Select(d => new WorkoutSessionDrillResponse
@@ -173,7 +196,8 @@ public class WorkoutsController : ControllerBase
                 Category = d.Category,
                 DurationMinutes = d.DurationMinutes,
                 CoachingNotes = d.CoachingNotes,
-                IsCompleted = d.IsCompleted
+                IsCompleted = d.IsCompleted,
+                SelfRating = d.SelfRating
             }).ToList()
     };
 }
@@ -183,6 +207,7 @@ public class CompleteWorkoutSessionRequest
     public int DurationMinutes { get; set; }
     public string? Warmup { get; set; }
     public string? Cooldown { get; set; }
+    public string? Notes { get; set; }
     public List<CompleteWorkoutSessionDrill> Drills { get; set; } = new();
 }
 
@@ -193,6 +218,7 @@ public class CompleteWorkoutSessionDrill
     public int DurationMinutes { get; set; }
     public string? CoachingNotes { get; set; }
     public bool IsCompleted { get; set; }
+    public int? SelfRating { get; set; }
 }
 
 public class WorkoutSessionResponse
@@ -202,6 +228,7 @@ public class WorkoutSessionResponse
     public int DurationMinutes { get; set; }
     public string? Warmup { get; set; }
     public string? Cooldown { get; set; }
+    public string? Notes { get; set; }
     public List<WorkoutSessionDrillResponse> Drills { get; set; } = new();
 }
 
@@ -212,6 +239,7 @@ public class WorkoutSessionDrillResponse
     public int DurationMinutes { get; set; }
     public string? CoachingNotes { get; set; }
     public bool IsCompleted { get; set; }
+    public int? SelfRating { get; set; }
 }
 
 public class WorkoutSessionListResponse
