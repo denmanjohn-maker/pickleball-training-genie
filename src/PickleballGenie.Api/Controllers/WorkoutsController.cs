@@ -52,15 +52,12 @@ public class WorkoutsController : ControllerBase
             .Where(p => p.UserId == userId && p.Status == DrillStatus.Mastered)
             .Select(p => p.DrillId);
 
-        var drills = await _context.Drills
+        var eligibleDrills = await _context.Drills
             .Where(d => d.TargetDUPRLevel >= user.CurrentDUPR && d.TargetDUPRLevel <= user.TargetDUPR)
             .Where(d => !masteredDrillIds.Contains(d.Id))
-            .OrderBy(d => d.TargetDUPRLevel)
-            .ThenBy(d => d.Category)
-            .Take(20)
             .ToListAsync();
 
-        if (!drills.Any())
+        if (!eligibleDrills.Any())
             return BadRequest("No drills found for your DUPR range. Please run the scraper to populate the drill database.");
 
         // Close the feedback loop: average the player's recent per-category
@@ -75,6 +72,9 @@ public class WorkoutsController : ControllerBase
             .GroupBy(d => d.Category)
             .Select(g => new { Category = g.Key, Average = g.Average(d => (double)d.SelfRating!) })
             .ToDictionaryAsync(x => x.Category, x => x.Average);
+
+        var drills = WorkoutDrillSelector.Select(
+            eligibleDrills, recentRatings, WorkoutDrillSelector.DefaultMaxDrills, Random.Shared);
 
         try
         {
