@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("PickleballGenie.Models")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a059f69fce3a993e27d296039d38d7637c7044b3")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+bb75290d2d8dd967b60a8221360a7f3178822aa0")]
 [assembly: System.Reflection.AssemblyProductAttribute("PickleballGenie.Models")]
 [assembly: System.Reflection.AssemblyTitleAttribute("PickleballGenie.Models")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
