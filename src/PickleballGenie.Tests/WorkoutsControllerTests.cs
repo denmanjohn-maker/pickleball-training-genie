@@ -427,6 +427,51 @@ public class WorkoutsControllerTests
         var statusResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(502, statusResult.StatusCode);
     }
+
+    [Fact]
+    public async Task GenerateWorkout_CapsPromptDrills_AndCoversAllCategories()
+    {
+        var options = InMemoryOptions();
+        using var context = new AppDbContext(options);
+
+        var userId = Guid.NewGuid();
+        var user = new User { Id = userId, UserName = "u", Email = "u@t.com", SinglesDUPR = 3.0m, TargetDUPR = 3.5m };
+        context.Users.Add(user);
+
+        // 30 in-range drills across 3 categories — more than the selector cap.
+        // Titles are zero-padded so no title is a substring of another.
+        var titles = new List<string>();
+        foreach (var category in new[] { "Dinking", "Serving", "Drops" })
+            for (var i = 0; i < 10; i++)
+            {
+                var title = $"{category} Drill {i:D2}";
+                titles.Add(title);
+                context.Drills.Add(new Drill { Title = title, TargetDUPRLevel = 3.0m, Category = category, EstimatedDurationMinutes = 10 });
+            }
+        await context.SaveChangesAsync();
+
+        var captured = "";
+        var handler = new CapturingHttpMessageHandler(async req =>
+        {
+            captured = req.Content != null ? await req.Content.ReadAsStringAsync() : "";
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(ValidLlmResponse("{\"drills\":[],\"totalDuration\":30,\"warmup\":\"\",\"cooldown\":\"\",\"coachingNotes\":\"\"}"), Encoding.UTF8, "application/json")
+            };
+        });
+
+        var controller = BuildController(context, user, handler);
+
+        var result = await controller.GenerateWorkout(new GenerateWorkoutRequest { DurationMinutes = 30 });
+
+        Assert.IsType<OkObjectResult>(result);
+        var promptedTitles = titles.Where(t => captured.Contains(t)).ToList();
+        Assert.Equal(WorkoutDrillSelector.DefaultMaxDrills, promptedTitles.Count);
+        // Stratified selection: every seeded category made it into the prompt.
+        Assert.Contains(promptedTitles, t => t.StartsWith("Dinking"));
+        Assert.Contains(promptedTitles, t => t.StartsWith("Serving"));
+        Assert.Contains(promptedTitles, t => t.StartsWith("Drops"));
+    }
 }
 
 file class StaticHttpMessageHandler : HttpMessageHandler

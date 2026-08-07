@@ -113,7 +113,7 @@ Core content of the application. Scraped from the internet and manually curated.
 | `Id` | UUID | Primary key |
 | `Title` | text | Drill name |
 | `Description` | text | Full drill instructions |
-| `TargetDUPRLevel` | decimal | One of: 3.0, 3.5, 4.0, 5.0 |
+| `TargetDUPRLevel` | decimal | One of: 2.0, 2.5, 3.0, 3.5, 4.0, 5.0 |
 | `Category` | text | Shot type: Dinking, Drops, Volleys, Serving, Returns, Lobs, Resets, Attacking, Movement, General |
 | `EstimatedDurationMinutes` | int | Approximate time to complete the drill (default: 10) |
 | `VideoUrl` | text? | Optional instructional video link |
@@ -149,7 +149,7 @@ Junction table tracking which drills each user has worked on or mastered.
 ### Flow (`POST /api/workouts/generate`)
 1. Resolve user from JWT claim (`ClaimTypes.NameIdentifier`)
 2. Determine session duration: `request.DurationMinutes ?? user.PreferredSessionDurationMinutes ?? 30`
-3. Query `Drills` where `TargetDUPRLevel` is within `[CurrentDUPR, TargetDUPR]`, take up to 20
+3. Query all `Drills` where `TargetDUPRLevel` is within `[CurrentDUPR, TargetDUPR]` (excluding mastered ones), then pick up to 24 via `WorkoutDrillSelector` — category-stratified round-robin, weighted toward the player's lowest self-rated categories, shuffled so repeated generations surface different drills
 4. Call `IWorkoutLlmService.GeneratePlanAsync` (`Services/WorkoutLlmService.cs`), which builds a prompt from the drill list and user's level context
 5. POST to DeepInfra's OpenAI-compatible endpoint (`v1/openai/chat/completions`) with model `deepseek-ai/DeepSeek-V3` (override via `DeepInfra:Model`) and `response_format: json_object`
 6. Deserialize `choices[0].message.content` into `WorkoutPlanResponse`; the controller maps service exceptions to 503 (missing key) or 502 (API error / unparseable response)
@@ -173,7 +173,7 @@ File: `src/PickleballGenie.Scraper/Program.cs`
 ### How It Works
 1. Connects to the database and runs any pending EF migrations
 2. Attempts to scrape configured pickleball sites using `HtmlAgilityPack`
-3. Falls back to a curated list of high-quality drills covering all DUPR levels and categories
+3. Always appends the curated drill list from `PickleballGenie.Data/CuratedDrills.cs` — the single source of truth shared with `DbSeeder`. Curated drills carry pinned GUIDs (`a1000000-...-00NN`); when adding drills, extend the sequence — never renumber or reuse an Id, and keep Titles unique (the scraper dedupes by Title, DbSeeder by Id)
 4. Skips drills whose `Title` already exists in the database (idempotent)
 
 Drill seeding is handled only by the Scraper — not via EF seed data or migrations.
