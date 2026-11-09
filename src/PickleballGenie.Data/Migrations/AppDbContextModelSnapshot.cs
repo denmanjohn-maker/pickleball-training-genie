@@ -169,7 +169,13 @@ namespace PickleballGenie.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("Equipment")
+                        .HasColumnType("text");
+
                     b.Property<int>("EstimatedDurationMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MinPlayers")
                         .HasColumnType("integer");
 
                     b.Property<string>("SourceUrl")

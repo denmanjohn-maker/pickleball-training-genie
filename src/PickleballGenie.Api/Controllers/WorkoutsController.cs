@@ -42,6 +42,9 @@ public class WorkoutsController : ControllerBase
         if (user.TargetDUPR < user.CurrentDUPR)
             return BadRequest("TargetDUPR must be greater than or equal to CurrentDUPR.");
 
+        if (!PlayersAvailable.IsValid(request.PlayersAvailable))
+            return BadRequest(PlayersAvailable.ValidationMessage);
+
         var durationMinutes = request.DurationMinutes
             ?? user.PreferredSessionDurationMinutes
             ?? 30;
@@ -52,13 +55,26 @@ public class WorkoutsController : ControllerBase
             .Where(p => p.UserId == userId && p.Status == DrillStatus.Mastered)
             .Select(p => p.DrillId);
 
-        var eligibleDrills = await _context.Drills
+        var inRange = _context.Drills
             .Where(d => d.TargetDUPRLevel >= user.CurrentDUPR && d.TargetDUPRLevel <= user.TargetDUPR)
-            .Where(d => !masteredDrillIds.Contains(d.Id))
+            .Where(d => !masteredDrillIds.Contains(d.Id));
+
+        var playersAvailable = request.PlayersAvailable;
+        var eligibleDrills = await inRange
+            .Where(d => playersAvailable == null || d.MinPlayers <= playersAvailable)
             .ToListAsync();
 
         if (!eligibleDrills.Any())
+        {
+            // Tell the player what to change: the players filter is theirs to
+            // flip, an empty DUPR range is an operator problem.
+            if (playersAvailable != null && await inRange.AnyAsync())
+                return BadRequest(playersAvailable == PlayersAvailable.Solo
+                    ? "No solo drills found for your DUPR range yet. Try 'With a partner' or widen your target DUPR."
+                    : "No drills found for your DUPR range and training group. Try a different 'Who's training?' choice or widen your target DUPR.");
+
             return BadRequest("No drills found for your DUPR range. Please run the scraper to populate the drill database.");
+        }
 
         // Close the feedback loop: average the player's recent per-category
         // self-ratings so the LLM leans into skills they reported struggling
@@ -78,7 +94,8 @@ public class WorkoutsController : ControllerBase
 
         try
         {
-            var workoutPlan = await _llmService.GeneratePlanAsync(user, drills, durationMinutes, recentRatings);
+            var workoutPlan = await _llmService.GeneratePlanAsync(user, drills, durationMinutes, recentRatings, playersAvailable);
+            EnrichPlan(workoutPlan, drills);
             return Ok(workoutPlan);
         }
         catch (WorkoutConfigurationException ex)
@@ -180,6 +197,36 @@ public class WorkoutsController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// Attaches the catalog drill behind each plan item so clients can show the
+    /// full instructions, the solo/partner tag and equipment without a second
+    /// request. The LLM is asked to echo each drill's list number; when it
+    /// doesn't, fall back to an exact (case-insensitive) title match. Items
+    /// that match nothing — the model invented or renamed a drill — keep nulls.
+    /// </summary>
+    internal static void EnrichPlan(WorkoutPlanResponse plan, IReadOnlyList<Drill> prompted)
+    {
+        foreach (var item in plan.Drills)
+        {
+            Drill? match = null;
+            if (item.DrillNumber is int n && n >= 1 && n <= prompted.Count)
+                match = prompted[n - 1];
+
+            match ??= prompted.FirstOrDefault(d =>
+                string.Equals(d.Title.Trim(), item.Title.Trim(), StringComparison.OrdinalIgnoreCase));
+
+            if (match == null)
+                continue;
+
+            item.DrillId = match.Id.ToString();
+            item.Title = match.Title;
+            item.Category = match.Category;
+            item.Description = match.Description;
+            item.MinPlayers = match.MinPlayers;
+            item.Equipment = match.Equipment;
+        }
+    }
+
     private static WorkoutSessionResponse ToSessionResponse(WorkoutSession session) => new()
     {
         Id = session.Id.ToString(),
@@ -253,6 +300,13 @@ public class WorkoutSessionListResponse
 public class GenerateWorkoutRequest
 {
     public int? DurationMinutes { get; set; }
+
+    /// <summary>
+    /// Who the player has to train with: 1 = just me, 2 = one partner,
+    /// 4 = a group of 3-4. Null leaves the catalog unfiltered.
+    /// See <see cref="PlayersAvailable"/>.
+    /// </summary>
+    public int? PlayersAvailable { get; set; }
 }
 
 public class WorkoutDrillItem
@@ -268,6 +322,24 @@ public class WorkoutDrillItem
 
     [JsonPropertyName("coachingNotes")]
     public string CoachingNotes { get; set; } = string.Empty;
+
+    /// <summary>1-based position in the drill list the LLM was shown; used to map the item back to its catalog drill.</summary>
+    [JsonPropertyName("drillNumber")]
+    public int? DrillNumber { get; set; }
+
+    // Populated server-side from the matched catalog drill (null when the LLM
+    // returned a title that matches nothing it was given).
+    [JsonPropertyName("drillId")]
+    public string? DrillId { get; set; }
+
+    [JsonPropertyName("description")]
+    public string? Description { get; set; }
+
+    [JsonPropertyName("minPlayers")]
+    public int? MinPlayers { get; set; }
+
+    [JsonPropertyName("equipment")]
+    public string? Equipment { get; set; }
 }
 
 public class WorkoutPlanResponse

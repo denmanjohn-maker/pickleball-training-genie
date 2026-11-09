@@ -12,7 +12,8 @@ public interface IWorkoutLlmService
         User user,
         List<Drill> drills,
         int durationMinutes,
-        IReadOnlyDictionary<string, double>? recentCategoryRatings = null);
+        IReadOnlyDictionary<string, double>? recentCategoryRatings = null,
+        int? playersAvailable = null);
 }
 
 public class DeepInfraWorkoutLlmService : IWorkoutLlmService
@@ -34,7 +35,8 @@ public class DeepInfraWorkoutLlmService : IWorkoutLlmService
         User user,
         List<Drill> drills,
         int durationMinutes,
-        IReadOnlyDictionary<string, double>? recentCategoryRatings = null)
+        IReadOnlyDictionary<string, double>? recentCategoryRatings = null,
+        int? playersAvailable = null)
     {
         var configKey = _configuration["DeepInfraApiKey"];
         var apiKey = !string.IsNullOrWhiteSpace(configKey)
@@ -44,8 +46,27 @@ public class DeepInfraWorkoutLlmService : IWorkoutLlmService
         if (string.IsNullOrWhiteSpace(apiKey))
             throw new WorkoutConfigurationException("Workout generation is not configured. Please set DEEPINFRA_API_KEY.");
 
+        // Each line carries the drill's player tag and gear so the model can
+        // honour the training context, and the description is flattened to one
+        // line because the curated template uses line breaks between sections.
         var drillList = string.Join("\n", drills.Select((d, i) =>
-            $"{i + 1}. [{d.Category}] \"{d.Title}\" (~{d.EstimatedDurationMinutes} min, DUPR {d.TargetDUPRLevel}): {d.Description}"));
+        {
+            var needs = string.IsNullOrWhiteSpace(d.Equipment) ? "" : $", needs: {d.Equipment}";
+            var description = d.Description.ReplaceLineEndings(" ").Replace("  ", " ");
+            return $"{i + 1}. [{d.Category}] [{PlayersAvailable.TagForMinPlayers(d.MinPlayers)}{needs}] \"{d.Title}\" (~{d.EstimatedDurationMinutes} min, DUPR {d.TargetDUPRLevel}): {description}";
+        }));
+
+        var trainingContext = playersAvailable switch
+        {
+            PlayersAvailable.Solo =>
+                "Training context: the player is training ALONE. Every drill below is tagged [Solo] and needs no one else. Coaching notes must never reference a partner, feeder or opponent; refer to the wall, ball machine, self-feed or target instead.",
+            PlayersAvailable.Partner =>
+                "Training context: the player has ONE partner. Use [Solo] or [Partner] drills; never a [Group] drill. Where a drill has the partner feeding, say so and suggest swapping roles.",
+            PlayersAvailable.Group =>
+                "Training context: the player has a GROUP of 3-4. Prefer [Group] doubles-pattern drills where they fit and use [Partner] drills for the rest, with notes that keep everyone active (rotate feeders, run two pairs).",
+            _ =>
+                "Training context: unknown. Prefer drills that work with one partner."
+        };
 
         // Post-session self-ratings (1 = struggled … 5 = nailed it), when the
         // player has provided any — lets the plan lean into weak skills.
@@ -69,15 +90,18 @@ public class DeepInfraWorkoutLlmService : IWorkoutLlmService
             - Current DUPR: {{user.CurrentDUPR}} ({{DUPRLabel(user.CurrentDUPR)}})
             - Target DUPR: {{user.TargetDUPR}} ({{DUPRLabel(user.TargetDUPR)}})
 
-            Available drills:
+            {{trainingContext}}
+
+            Available drills (numbered; each shows its category, who it needs and any gear):
             {{drillList}}
             {{ratingsSection}}
-            Select drills that fit within {{durationMinutes}} minutes total. Include warmup and cooldown time. Prioritize variety across categories. For each chosen drill, provide level-specific coaching notes relevant to a DUPR {{user.CurrentDUPR}} player working toward DUPR {{user.TargetDUPR}}.
+            Select drills that fit within {{durationMinutes}} minutes total. Include warmup and cooldown time. Prioritize variety across categories. Only choose drills from the list above; set drillNumber to the drill's number in that list and copy its title exactly. For each chosen drill, provide level-specific coaching notes relevant to a DUPR {{user.CurrentDUPR}} player working toward DUPR {{user.TargetDUPR}}.
 
             Respond with ONLY a valid JSON object matching this exact schema — no markdown, no explanation:
             {
               "drills": [
                 {
+                  "drillNumber": 1,
                   "title": "string",
                   "category": "string",
                   "durationMinutes": 10,

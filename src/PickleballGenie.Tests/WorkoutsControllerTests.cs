@@ -472,6 +472,203 @@ public class WorkoutsControllerTests
         Assert.Contains(promptedTitles, t => t.StartsWith("Serving"));
         Assert.Contains(promptedTitles, t => t.StartsWith("Drops"));
     }
+
+    private static HttpMessageHandler CaptureHandler(Action<string> onBody, string planJson = "{\"drills\":[],\"totalDuration\":30,\"warmup\":\"\",\"cooldown\":\"\",\"coachingNotes\":\"\"}") =>
+        new CapturingHttpMessageHandler(async req =>
+        {
+            onBody(req.Content != null ? await req.Content.ReadAsStringAsync() : "");
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(ValidLlmResponse(planJson), Encoding.UTF8, "application/json")
+            };
+        });
+
+    private static (AppDbContext Context, User User) SeedUserWithMixedDrills(DbContextOptions<AppDbContext> options)
+    {
+        var context = new AppDbContext(options);
+        var user = new User { Id = Guid.NewGuid(), UserName = "u", Email = "u@t.com", SinglesDUPR = 3.0m, TargetDUPR = 3.5m };
+        context.Users.Add(user);
+        context.Drills.AddRange(
+            new Drill { Title = "Wall Dink Solo", Category = "Dinking", TargetDUPRLevel = 3.0m, MinPlayers = 1, Equipment = "Wall" },
+            new Drill { Title = "Partner Drop Feed", Category = "Drops", TargetDUPRLevel = 3.0m, MinPlayers = 2 },
+            new Drill { Title = "Doubles Lob Rotation", Category = "Lobs", TargetDUPRLevel = 3.5m, MinPlayers = 4 });
+        context.SaveChanges();
+        return (context, user);
+    }
+
+    [Fact]
+    public async Task GenerateWorkout_SoloContext_FiltersToSoloDrills_AndStatesContext()
+    {
+        var (context, user) = SeedUserWithMixedDrills(InMemoryOptions());
+        using var _ = context;
+
+        var captured = "";
+        var controller = BuildController(context, user, CaptureHandler(b => captured = b));
+
+        var result = await controller.GenerateWorkout(new GenerateWorkoutRequest { DurationMinutes = 30, PlayersAvailable = 1 });
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Contains("Wall Dink Solo", captured);
+        Assert.DoesNotContain("Partner Drop Feed", captured);
+        Assert.DoesNotContain("Doubles Lob Rotation", captured);
+        Assert.Contains("training ALONE", captured);
+        Assert.Contains("[Solo, needs: Wall]", captured);
+    }
+
+    [Fact]
+    public async Task GenerateWorkout_PartnerContext_ExcludesGroupDrills()
+    {
+        var (context, user) = SeedUserWithMixedDrills(InMemoryOptions());
+        using var _ = context;
+
+        var captured = "";
+        var controller = BuildController(context, user, CaptureHandler(b => captured = b));
+
+        var result = await controller.GenerateWorkout(new GenerateWorkoutRequest { DurationMinutes = 30, PlayersAvailable = 2 });
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Contains("Wall Dink Solo", captured);
+        Assert.Contains("Partner Drop Feed", captured);
+        Assert.DoesNotContain("Doubles Lob Rotation", captured);
+        Assert.Contains("ONE partner", captured);
+        Assert.Contains("[Partner]", captured);
+    }
+
+    [Fact]
+    public async Task GenerateWorkout_GroupContext_IncludesGroupDrills()
+    {
+        var (context, user) = SeedUserWithMixedDrills(InMemoryOptions());
+        using var _ = context;
+
+        var captured = "";
+        var controller = BuildController(context, user, CaptureHandler(b => captured = b));
+
+        var result = await controller.GenerateWorkout(new GenerateWorkoutRequest { DurationMinutes = 30, PlayersAvailable = 4 });
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Contains("Doubles Lob Rotation", captured);
+        Assert.Contains("[Group]", captured);
+        Assert.Contains("GROUP of 3-4", captured);
+    }
+
+    [Fact]
+    public async Task GenerateWorkout_NoPlayersAvailable_LeavesCatalogUnfiltered()
+    {
+        var (context, user) = SeedUserWithMixedDrills(InMemoryOptions());
+        using var _ = context;
+
+        var captured = "";
+        var controller = BuildController(context, user, CaptureHandler(b => captured = b));
+
+        var result = await controller.GenerateWorkout(new GenerateWorkoutRequest { DurationMinutes = 30 });
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Contains("Wall Dink Solo", captured);
+        Assert.Contains("Partner Drop Feed", captured);
+        Assert.Contains("Doubles Lob Rotation", captured);
+        Assert.Contains("Training context: unknown", captured);
+    }
+
+    [Fact]
+    public async Task GenerateWorkout_Returns400_WhenPlayersAvailableIsInvalid()
+    {
+        var (context, user) = SeedUserWithMixedDrills(InMemoryOptions());
+        using var _ = context;
+
+        var controller = BuildController(context, user, CaptureHandler(_ => { }));
+
+        var result = await controller.GenerateWorkout(new GenerateWorkoutRequest { DurationMinutes = 30, PlayersAvailable = 3 });
+
+        var bad = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Contains("playersAvailable", bad.Value!.ToString());
+    }
+
+    [Fact]
+    public async Task GenerateWorkout_Returns400WithSoloHint_WhenFilterEmptiesTheRange()
+    {
+        var options = InMemoryOptions();
+        using var context = new AppDbContext(options);
+        var user = new User { Id = Guid.NewGuid(), UserName = "u", Email = "u@t.com", SinglesDUPR = 3.0m, TargetDUPR = 3.5m };
+        context.Users.Add(user);
+        context.Drills.Add(new Drill { Title = "Partner Only", Category = "Dinking", TargetDUPRLevel = 3.0m, MinPlayers = 2 });
+        await context.SaveChangesAsync();
+
+        var controller = BuildController(context, user, CaptureHandler(_ => { }));
+
+        var result = await controller.GenerateWorkout(new GenerateWorkoutRequest { DurationMinutes = 30, PlayersAvailable = 1 });
+
+        var bad = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Contains("No solo drills", bad.Value!.ToString());
+    }
+
+    [Fact]
+    public async Task GenerateWorkout_EnrichesItems_ByNumberThenTitle_LeavingUnmatchedNull()
+    {
+        var options = InMemoryOptions();
+        using var context = new AppDbContext(options);
+        var user = new User { Id = Guid.NewGuid(), UserName = "u", Email = "u@t.com", SinglesDUPR = 3.0m, TargetDUPR = 3.5m };
+        context.Users.Add(user);
+        var solo = new Drill { Title = "Wall Dink Solo", Category = "Dinking", TargetDUPRLevel = 3.0m, MinPlayers = 1, Equipment = "Wall", Description = "Summary.\n\nSetup: wall." };
+        context.Drills.Add(solo);
+        await context.SaveChangesAsync();
+
+        var plan = """
+            {"drills":[
+              {"drillNumber":1,"title":"wall dink solo (renamed by model)","category":"dinking","durationMinutes":10,"coachingNotes":"a"},
+              {"title":"WALL DINK SOLO","category":"Dinking","durationMinutes":10,"coachingNotes":"b"},
+              {"title":"Invented Drill","category":"Dinking","durationMinutes":10,"coachingNotes":"c"}
+            ],"totalDuration":30,"warmup":"","cooldown":"","coachingNotes":""}
+            """;
+        var controller = BuildController(context, user, CaptureHandler(_ => { }, plan));
+
+        var result = await controller.GenerateWorkout(new GenerateWorkoutRequest { DurationMinutes = 30, PlayersAvailable = 1 });
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<WorkoutPlanResponse>(ok.Value);
+        Assert.Equal(3, response.Drills.Count);
+
+        // Matched by number: title and category normalised to the catalog.
+        Assert.Equal(solo.Id.ToString(), response.Drills[0].DrillId);
+        Assert.Equal("Wall Dink Solo", response.Drills[0].Title);
+        Assert.Equal("Dinking", response.Drills[0].Category);
+        Assert.Equal(solo.Description, response.Drills[0].Description);
+        Assert.Equal(1, response.Drills[0].MinPlayers);
+        Assert.Equal("Wall", response.Drills[0].Equipment);
+
+        // Matched by case-insensitive title.
+        Assert.Equal(solo.Id.ToString(), response.Drills[1].DrillId);
+        Assert.Equal(1, response.Drills[1].MinPlayers);
+
+        // Unmatched: left as the model returned it.
+        Assert.Null(response.Drills[2].DrillId);
+        Assert.Null(response.Drills[2].Description);
+        Assert.Null(response.Drills[2].MinPlayers);
+        Assert.Equal("Invented Drill", response.Drills[2].Title);
+    }
+
+    [Fact]
+    public async Task GenerateWorkout_FlattensTemplateDescriptions_InThePrompt()
+    {
+        var options = InMemoryOptions();
+        using var context = new AppDbContext(options);
+        var user = new User { Id = Guid.NewGuid(), UserName = "u", Email = "u@t.com", SinglesDUPR = 3.0m, TargetDUPR = 3.5m };
+        context.Users.Add(user);
+        context.Drills.Add(new Drill { Title = "Templated", Category = "Dinking", TargetDUPRLevel = 3.0m, MinPlayers = 1, Description = "Summary.\n\nSetup: a wall.\nHow to run it: dink." });
+        await context.SaveChangesAsync();
+
+        var captured = "";
+        var controller = BuildController(context, user, CaptureHandler(b => captured = b));
+
+        await controller.GenerateWorkout(new GenerateWorkoutRequest { DurationMinutes = 30 });
+
+        // The request body is JSON, so a literal newline inside the drill
+        // line would appear as the two characters \n. None should.
+        var promptStart = captured.IndexOf("1. [Dinking]", StringComparison.Ordinal);
+        Assert.True(promptStart > 0);
+        var line = captured[promptStart..captured.IndexOf("Select drills", promptStart, StringComparison.Ordinal)];
+        Assert.DoesNotContain("Setup: a wall.\\nHow", line);
+        Assert.Contains("Summary. Setup: a wall. How to run it: dink.", line);
+    }
 }
 
 file class StaticHttpMessageHandler : HttpMessageHandler

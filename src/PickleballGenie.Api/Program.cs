@@ -98,6 +98,11 @@ using (var scope = app.Services.CreateScope())
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     dbContext.Database.Migrate();
 
+    // Curated drills are code: upsert them by pinned Id so rewritten
+    // instructions and new tags reach this database on every deploy.
+    var (seededDrills, refreshedDrills) = await DbSeeder.SeedDrillsAsync(dbContext);
+    app.Logger.LogInformation("Curated drills: {Inserted} inserted, {Updated} refreshed.", seededDrills, refreshedDrills);
+
     // Seed test account
     var userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
     const string testEmail = "denman.john@gmail.com";

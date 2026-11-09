@@ -67,6 +67,12 @@ class Program
         {
             await dbContext.Database.MigrateAsync();
             Log("Migrations applied successfully.");
+
+            // Curated drills are upserted by pinned Id (insert missing, refresh
+            // existing) before any title-based dedupe runs, so a curated drill
+            // whose title was tightened can't be re-inserted under a new row.
+            var (inserted, updated) = await DbSeeder.SeedDrillsAsync(dbContext);
+            Log($"Curated drills upserted: {inserted} inserted, {updated} refreshed.");
         }
         catch (Exception ex)
         {
@@ -117,12 +123,7 @@ class Program
             await Task.Delay(TimeSpan.FromSeconds(2));
         }
 
-        Log($"--- Loading curated fallback drills ---");
-        var curated = GetCuratedDrills();
-        Log($"  {curated.Count} curated drills loaded");
-        allDrills.AddRange(curated);
-
-        Log($"Total drills collected (scraped + curated): {allDrills.Count}");
+        Log($"Total drills scraped: {allDrills.Count}");
 
         Log("Loading existing drill titles from database...");
         var existingTitles = await dbContext.Drills
@@ -233,8 +234,34 @@ class Program
             Category = MapCategory(title, description),
             TargetDUPRLevel = MapToDUPR(title, description),
             EstimatedDurationMinutes = EstimateDuration(title, description),
+            MinPlayers = InferMinPlayers(title, description),
             SourceUrl = sourceUrl,
         };
+    }
+
+    // Scraped pages rarely say outright whether a drill needs a partner, so
+    // this is a keyword guess. Unknown defaults to 2 (partner): a drill wrongly
+    // hidden from a solo player is a smaller harm than a partner drill handed
+    // to someone training alone.
+    static int InferMinPlayers(string title, string description)
+    {
+        var s = (title + " " + description).ToLower();
+        if (s.Contains("four players") || s.Contains("4 players") || s.Contains("doubles pattern")
+            || s.Contains("2v2") || s.Contains("2 vs 2") || s.Contains("all four positions"))
+            return 4;
+
+        var mentionsPartner = s.Contains("partner") || s.Contains("feeder") || s.Contains("opponent")
+            || s.Contains("teammate") || s.Contains("two players");
+        var negatesPartner = s.Contains("no partner") || s.Contains("without a partner") || s.Contains("partner optional");
+        if (mentionsPartner && !negatesPartner)
+            return 2;
+
+        if (s.Contains("solo") || s.Contains("alone") || s.Contains("by yourself") || s.Contains("on your own")
+            || s.Contains("wall") || s.Contains("ball machine") || s.Contains("self-feed") || s.Contains("self feed")
+            || s.Contains("shadow") || negatesPartner)
+            return 1;
+
+        return 2;
     }
 
     static decimal MapToDUPR(string title, string description)
@@ -276,8 +303,4 @@ class Program
         if (s.Contains("footwork") || s.Contains("movement")) return "Movement";
         return "General";
     }
-
-    // Curated drills live in PickleballGenie.Data.CuratedDrills, shared with
-    // DbSeeder. The title-based dedupe below keeps re-runs idempotent.
-    static List<Drill> GetCuratedDrills() => CuratedDrills.GetAll();
 }
