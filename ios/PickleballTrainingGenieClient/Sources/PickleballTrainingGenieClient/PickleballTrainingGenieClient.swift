@@ -16,6 +16,11 @@ public struct Drill: Codable, Equatable, Identifiable, Sendable {
     public let videoUrl: String?
     public let sourceUrl: String
     public let createdAt: String
+    /// 1 = can be done alone, 2 = needs one partner, 4 = needs a doubles group.
+    /// Optional so responses from backends without the column still decode.
+    public let minPlayers: Int?
+    /// Comma-separated gear beyond paddle, ball and court (e.g. "Wall, Cones or targets").
+    public let equipment: String?
 }
 
 public struct User: Codable, Equatable, Sendable {
@@ -38,6 +43,19 @@ public struct WorkoutDrillItem: Codable, Equatable, Sendable {
     public let category: String
     public let durationMinutes: Int
     public let coachingNotes: String
+    // Attached server-side from the catalog drill the plan item came from;
+    // nil when the model returned a title the server couldn't match.
+    public let drillId: String?
+    public let description: String?
+    public let minPlayers: Int?
+    public let equipment: String?
+}
+
+/// Who the player has available to train with; sent as `playersAvailable`.
+public enum PlayersAvailable: Int, Codable, Equatable, Sendable {
+    case solo = 1
+    case partner = 2
+    case group = 4
 }
 
 public struct WorkoutPlanResponse: Codable, Equatable, Sendable {
@@ -82,7 +100,7 @@ public class PickleballTrainingGenieClient {
         return try decoder.decode(MessageResponse.self, from: responseData)
     }
 
-    public func drills(category: String? = nil, level: Decimal? = nil) async throws -> [Drill] {
+    public func drills(category: String? = nil, level: Decimal? = nil, playersAvailable: PlayersAvailable? = nil) async throws -> [Drill] {
         var components = try urlComponents(path: "api/Drills")
         var queryItems: [URLQueryItem] = []
         if let category = category {
@@ -90,6 +108,9 @@ public class PickleballTrainingGenieClient {
         }
         if let level = level {
             queryItems.append(URLQueryItem(name: "level", value: NSDecimalNumber(decimal: level).stringValue))
+        }
+        if let playersAvailable = playersAvailable {
+            queryItems.append(URLQueryItem(name: "playersAvailable", value: String(playersAvailable.rawValue)))
         }
         if !queryItems.isEmpty {
             components.queryItems = queryItems
@@ -100,17 +121,31 @@ public class PickleballTrainingGenieClient {
         return try await request(url, method: "GET", requireAuth: false)
     }
 
-    public func recommendations() async throws -> [Drill] {
-        return try await request(url(path: "api/Drills/recommendations"), method: "GET", requireAuth: true)
+    public func recommendations(playersAvailable: PlayersAvailable? = nil) async throws -> [Drill] {
+        var components = try urlComponents(path: "api/Drills/recommendations")
+        if let playersAvailable = playersAvailable {
+            components.queryItems = [URLQueryItem(name: "playersAvailable", value: String(playersAvailable.rawValue))]
+        }
+        guard let url = components.url else {
+            throw PickleballTrainingGenieError.invalidURL
+        }
+        return try await request(url, method: "GET", requireAuth: true)
     }
 
     public func completeDrill(id: String) async throws -> MessageResponse {
         return try await request(url(path: "api/Drills/\(id)/complete"), method: "POST", body: [String: String](), requireAuth: true)
     }
 
-    public func generateWorkout(durationMinutes: Int? = nil) async throws -> WorkoutPlanResponse {
-        struct Request: Encodable { let durationMinutes: Int? }
-        return try await request(url(path: "api/workouts/generate"), method: "POST", body: Request(durationMinutes: durationMinutes), requireAuth: true)
+    public func generateWorkout(durationMinutes: Int? = nil, playersAvailable: PlayersAvailable? = nil) async throws -> WorkoutPlanResponse {
+        let body = GenerateWorkoutRequest(durationMinutes: durationMinutes, playersAvailable: playersAvailable?.rawValue)
+        return try await request(url(path: "api/workouts/generate"), method: "POST", body: body, requireAuth: true)
+    }
+
+    /// Body of `POST api/workouts/generate`. Both fields are optional; nil
+    /// values are omitted so older backends see the same request as before.
+    struct GenerateWorkoutRequest: Encodable, Equatable {
+        let durationMinutes: Int?
+        let playersAvailable: Int?
     }
 
     func urlComponents(path: String) throws -> URLComponents {

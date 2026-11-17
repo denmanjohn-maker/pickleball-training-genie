@@ -59,25 +59,104 @@ public class CuratedDrillsTests
     }
 
     [Fact]
-    public void CatalogHasTwelveDrillsPerLevel()
+    public void CatalogHasTwentyDrillsPerLevel()
     {
         var drills = CuratedDrills.GetAll();
-        Assert.Equal(72, drills.Count);
+        Assert.Equal(120, drills.Count);
         foreach (var level in ValidLevels)
-            Assert.Equal(12, drills.Count(d => d.TargetDUPRLevel == level));
+            Assert.Equal(20, drills.Count(d => d.TargetDUPRLevel == level));
     }
 
     [Fact]
-    public void BeginnerTierDrillsAreSoloFriendlyOrPartnerLabelled()
+    public void IdsFollowThePinnedSequence()
     {
-        // Per CLAUDE.md, the 2.0/2.5 tier is deliberately solo-friendly.
-        // Every drill there must say whether it can be done alone or needs a partner.
-        var drills = CuratedDrills.GetAll().Where(d => d.TargetDUPRLevel <= 2.5m);
-        Assert.All(drills, d =>
+        // DbSeeder upserts by Id, so every curated drill must sit in the
+        // a1000000-...-NNN sequence with no gaps: a gap means a drill was
+        // deleted or renumbered, which would orphan rows in deployed databases.
+        var drills = CuratedDrills.GetAll();
+        var expected = Enumerable.Range(1, drills.Count)
+            .Select(n => Guid.Parse($"a1000000-0000-0000-0000-{n:D12}"))
+            .ToHashSet();
+        Assert.Equal(expected, drills.Select(d => d.Id).ToHashSet());
+    }
+
+    [Fact]
+    public void MinPlayersIsOneTwoOrFour()
+    {
+        var drills = CuratedDrills.GetAll();
+        Assert.All(drills, d => Assert.Contains(d.MinPlayers, new[] { 1, 2, 4 }));
+    }
+
+    [Fact]
+    public void EveryLevelHasAtLeastEightSoloDrills()
+    {
+        // The player who can't get a coach usually can't get a drilling partner
+        // either, at every level — not just as a beginner.
+        var drills = CuratedDrills.GetAll();
+        foreach (var level in ValidLevels)
             Assert.True(
-                d.Description.Contains("solo", StringComparison.OrdinalIgnoreCase)
-                    || d.Description.Contains("partner", StringComparison.OrdinalIgnoreCase),
-                $"\"{d.Title}\" must mention 'solo' or 'partner' in its description."));
+                drills.Count(d => d.TargetDUPRLevel == level && d.MinPlayers == 1) >= 8,
+                $"Level {level} needs at least eight solo drills.");
+    }
+
+    [Fact]
+    public void EveryLevelHasPartnerDrills_AndGroupDrillsExistAtAdvancedLevels()
+    {
+        var drills = CuratedDrills.GetAll();
+        foreach (var level in ValidLevels)
+            Assert.Contains(drills, d => d.TargetDUPRLevel == level && d.MinPlayers == 2);
+        Assert.Contains(drills, d => d.TargetDUPRLevel == 4.0m && d.MinPlayers == 4);
+        Assert.Contains(drills, d => d.TargetDUPRLevel == 5.0m && d.MinPlayers == 4);
+    }
+
+    [Fact]
+    public void DescriptionsFollowTheTemplate()
+    {
+        // Clients split the description on these labels to render sections,
+        // and the LLM prompt relies on the same structure being present.
+        var labels = new[] { "Setup:", "How to run it:", "Goal:", "Coaching cue:" };
+        var drills = CuratedDrills.GetAll();
+        Assert.All(drills, d =>
+        {
+            var last = -1;
+            foreach (var label in labels)
+            {
+                var index = d.Description.IndexOf(label, StringComparison.Ordinal);
+                Assert.True(index > last, $"\"{d.Title}\" is missing or misorders '{label}'.");
+                last = index;
+            }
+            // A one-sentence summary precedes the sections.
+            Assert.True(d.Description.IndexOf("Setup:", StringComparison.Ordinal) > 20,
+                $"\"{d.Title}\" needs a summary sentence before 'Setup:'.");
+        });
+    }
+
+    [Fact]
+    public void SoloDrillsDoNotRequireAPartner()
+    {
+        // A solo drill's text may mention a partner only to say one isn't needed;
+        // otherwise a player training alone gets instructions they can't follow.
+        var solo = CuratedDrills.GetAll().Where(d => d.MinPlayers == 1);
+        Assert.All(solo, d =>
+        {
+            var text = d.Description.ToLowerInvariant();
+            foreach (var negated in new[] { "no partner", "without a partner", "partner optional", "partner-free", "if a partner" })
+                text = text.Replace(negated, " ");
+            Assert.DoesNotContain("partner", text);
+            Assert.DoesNotContain("feeder", text);
+        });
+    }
+
+    [Fact]
+    public void EquipmentUsesTheSharedVocabulary()
+    {
+        // Clients render equipment as pills and the prompt lists it verbatim,
+        // so spellings must stay consistent.
+        var allowed = new[] { "Wall", "Ball machine", "Bucket of balls", "Cones or targets" };
+        var drills = CuratedDrills.GetAll().Where(d => d.Equipment != null);
+        Assert.All(drills, d =>
+            Assert.All(d.Equipment!.Split(',', StringSplitOptions.TrimEntries),
+                item => Assert.Contains(item, allowed)));
     }
 
     [Fact]
@@ -93,8 +172,11 @@ public class CuratedDrillsTests
         foreach (var category in new[] { "Drops", "Attacking", "Resets", "Movement" })
             Assert.Contains(drills, d => d.Category == category && d.TargetDUPRLevel < 3.5m);
 
-        // Neglected categories exist at advanced levels.
-        foreach (var category in new[] { "Returns", "Movement", "Resets", "Lobs" })
-            Assert.Contains(drills, d => d.Category == category && d.TargetDUPRLevel >= 4.0m);
+        // From 3.0 up, every category is available at every level.
+        foreach (var level in ValidLevels.Where(l => l >= 3.0m))
+            foreach (var category in ValidCategories)
+                Assert.True(
+                    drills.Any(d => d.Category == category && d.TargetDUPRLevel == level),
+                    $"No {category} drill at DUPR {level}.");
     }
 }

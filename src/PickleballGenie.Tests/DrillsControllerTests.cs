@@ -57,7 +57,7 @@ public class DrillsControllerTests
         };
 
         // Act
-        var result = await controller.GetRecommendations();
+        var result = await controller.GetRecommendations(null);
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
@@ -106,7 +106,7 @@ public class DrillsControllerTests
         };
 
         // Act
-        var result = await controller.GetRecommendations();
+        var result = await controller.GetRecommendations(null);
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
@@ -163,7 +163,7 @@ public class DrillsControllerTests
         };
 
         // Act
-        var result = await controller.GetRecommendations();
+        var result = await controller.GetRecommendations(null);
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
@@ -172,5 +172,85 @@ public class DrillsControllerTests
         Assert.Single(drills);
         Assert.Contains(drills, d => d.Title == "Unmastered Drill");
         Assert.DoesNotContain(drills, d => d.Title == "Mastered Drill");
+    }
+
+    private static DrillsController ControllerFor(AppDbContext context, Guid userId)
+    {
+        var controller = new DrillsController(context);
+        var userClaims = new ClaimsPrincipal(new ClaimsIdentity(new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, userId.ToString())
+        }, "mock"));
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = userClaims }
+        };
+        return controller;
+    }
+
+    private static void SeedMixedPlayers(AppDbContext context)
+    {
+        context.Drills.AddRange(
+            new Drill { Title = "Solo Wall", TargetDUPRLevel = 3.0m, Category = "Dinking", MinPlayers = 1 },
+            new Drill { Title = "Partner Feed", TargetDUPRLevel = 3.0m, Category = "Drops", MinPlayers = 2 },
+            new Drill { Title = "Group Pattern", TargetDUPRLevel = 3.5m, Category = "Lobs", MinPlayers = 4 });
+    }
+
+    [Fact]
+    public async Task GetDrills_FiltersByPlayersAvailable()
+    {
+        var options = GetInMemoryOptions();
+        using var context = new AppDbContext(options);
+        SeedMixedPlayers(context);
+        await context.SaveChangesAsync();
+        var controller = new DrillsController(context);
+
+        var solo = Assert.IsAssignableFrom<IEnumerable<Drill>>(
+            Assert.IsType<OkObjectResult>(await controller.GetDrills(null, null, 1)).Value).ToList();
+        var pair = Assert.IsAssignableFrom<IEnumerable<Drill>>(
+            Assert.IsType<OkObjectResult>(await controller.GetDrills(null, null, 2)).Value).ToList();
+        var all = Assert.IsAssignableFrom<IEnumerable<Drill>>(
+            Assert.IsType<OkObjectResult>(await controller.GetDrills(null, null, null)).Value).ToList();
+
+        Assert.Single(solo);
+        Assert.Equal("Solo Wall", solo[0].Title);
+        Assert.Equal(2, pair.Count);
+        Assert.DoesNotContain(pair, d => d.Title == "Group Pattern");
+        Assert.Equal(3, all.Count);
+    }
+
+    [Fact]
+    public async Task GetDrills_Returns400_ForInvalidPlayersAvailable()
+    {
+        var options = GetInMemoryOptions();
+        using var context = new AppDbContext(options);
+        var controller = new DrillsController(context);
+
+        var result = await controller.GetDrills(null, null, 3);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task GetRecommendations_FiltersByPlayersAvailable()
+    {
+        var options = GetInMemoryOptions();
+        using var context = new AppDbContext(options);
+        var userId = Guid.NewGuid();
+        context.Users.Add(new User { Id = userId, Email = "t@e.com", UserName = "t@e.com", SinglesDUPR = 3.0m, TargetDUPR = 3.5m });
+        SeedMixedPlayers(context);
+        await context.SaveChangesAsync();
+        var controller = ControllerFor(context, userId);
+
+        var solo = Assert.IsAssignableFrom<IEnumerable<Drill>>(
+            Assert.IsType<OkObjectResult>(await controller.GetRecommendations(1)).Value).ToList();
+        var group = Assert.IsAssignableFrom<IEnumerable<Drill>>(
+            Assert.IsType<OkObjectResult>(await controller.GetRecommendations(4)).Value).ToList();
+
+        Assert.Single(solo);
+        Assert.Equal("Solo Wall", solo[0].Title);
+        Assert.Equal(3, group.Count);
+
+        Assert.IsType<BadRequestObjectResult>(await controller.GetRecommendations(3));
     }
 }

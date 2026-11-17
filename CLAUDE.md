@@ -59,7 +59,9 @@ DUPR (Dynamic Universal Pickleball Rating) is the skill rating used throughout t
 | 4.0 | Advanced | Competitive play, pattern recognition, speed-up/reset sequences |
 | 5.0 | Professional | Tournament-level, advanced tactics (ATP, Erne), match simulation |
 
-**Drills are tagged with a `TargetDUPRLevel`** (2.0, 2.5, 3.0, 3.5, 4.0, or 5.0). The curated 2.0/2.5 drills are deliberately solo-friendly — players without access to coaching usually lack a drilling partner too. When generating workouts or recommendations, drills are filtered to those where `TargetDUPRLevel >= user.CurrentDUPR AND TargetDUPRLevel <= user.TargetDUPR`. This ensures users practice skills at and just above their current level — the optimal zone for improvement.
+**Drills are tagged with a `TargetDUPRLevel`** (2.0, 2.5, 3.0, 3.5, 4.0, or 5.0). When generating workouts or recommendations, drills are filtered to those where `TargetDUPRLevel >= user.CurrentDUPR AND TargetDUPRLevel <= user.TargetDUPR`. This ensures users practice skills at and just above their current level — the optimal zone for improvement.
+
+**Drills are also tagged with `MinPlayers`** (1 = solo: wall, ball machine, self-feed or shadow work; 2 = one partner or feeder; 4 = a doubles group) and an optional `Equipment` list. Players without access to coaching usually lack a drilling partner too, so every level of the curated catalog has at least eight solo drills. Clients send `playersAvailable` (1, 2 or 4) with workout, drill-list and recommendation requests and the API keeps drills where `MinPlayers <= playersAvailable`; omitting it leaves the catalog unfiltered. `PlayersAvailable` in `Api/Services` holds the constants and validation.
 
 **`User.CurrentDUPR` is a computed, `[NotMapped]` property**: `Math.Max(SinglesDUPR ?? 0, DoublesDUPR ?? 0)`. The stored columns are the nullable `SinglesDUPR` and `DoublesDUPR`. Keep DUPR values `decimal` in .NET and `Decimal` in Swift — never `double`/`float`.
 
@@ -92,10 +94,10 @@ DUPR (Dynamic Universal Pickleball Rating) is the skill rating used throughout t
 | `POST /api/Users/dupr-login` | — | DUPR OAuth login (creates or links account) |
 | `GET /api/Users/profile` | JWT | Current user's profile |
 | `PUT /api/Users/profile/ratings` | JWT | Update Singles/Doubles/Target DUPR |
-| `GET /api/Drills?category=&level=` | — | Browse drills with optional filters |
-| `GET /api/Drills/recommendations` | JWT | Drills within the user's DUPR range |
+| `GET /api/Drills?category=&level=&playersAvailable=` | — | Browse drills with optional filters |
+| `GET /api/Drills/recommendations?playersAvailable=` | JWT | Drills within the user's DUPR range |
 | `POST /api/Drills/{id}/complete` | JWT | Mark a drill mastered (`UserDrillProgress`) |
-| `POST /api/workouts/generate` | JWT | LLM-generated workout plan |
+| `POST /api/workouts/generate` | JWT | LLM-generated workout plan (`durationMinutes`, `playersAvailable`) |
 
 ### DUPR OAuth Integration
 
@@ -116,6 +118,8 @@ Core content of the application. Scraped from the internet and manually curated.
 | `TargetDUPRLevel` | decimal | One of: 2.0, 2.5, 3.0, 3.5, 4.0, 5.0 |
 | `Category` | text | Shot type: Dinking, Drops, Volleys, Serving, Returns, Lobs, Resets, Attacking, Movement, General |
 | `EstimatedDurationMinutes` | int | Approximate time to complete the drill (default: 10) |
+| `MinPlayers` | int | 1 = solo, 2 = partner, 4 = group (default: 2, so untagged scraped drills are hidden from solo players) |
+| `Equipment` | text? | Comma-separated gear from a fixed vocabulary: Wall, Ball machine, Bucket of balls, Cones or targets |
 | `VideoUrl` | text? | Optional instructional video link |
 | `SourceUrl` | text | Where the drill was sourced from |
 | `CreatedAt` | datetime | Insertion timestamp |
@@ -149,13 +153,14 @@ Junction table tracking which drills each user has worked on or mastered.
 ### Flow (`POST /api/workouts/generate`)
 1. Resolve user from JWT claim (`ClaimTypes.NameIdentifier`)
 2. Determine session duration: `request.DurationMinutes ?? user.PreferredSessionDurationMinutes ?? 30`
-3. Query all `Drills` where `TargetDUPRLevel` is within `[CurrentDUPR, TargetDUPR]` (excluding mastered ones), then pick up to 24 via `WorkoutDrillSelector` — category-stratified round-robin, weighted toward the player's lowest self-rated categories, shuffled so repeated generations surface different drills
+3. Query all `Drills` where `TargetDUPRLevel` is within `[CurrentDUPR, TargetDUPR]` (excluding mastered ones) and, when `request.PlayersAvailable` is set, where `MinPlayers <= PlayersAvailable`; then pick up to 24 via `WorkoutDrillSelector` — category-stratified round-robin, weighted toward the player's lowest self-rated categories, shuffled so repeated generations surface different drills. If the players filter alone empties the set, the 400 message tells the player to change their "Who's training?" choice
 4. Call `IWorkoutLlmService.GeneratePlanAsync` (`Services/WorkoutLlmService.cs`), which builds a prompt from the drill list and user's level context
 5. POST to DeepInfra's OpenAI-compatible endpoint (`v1/openai/chat/completions`) with model `deepseek-ai/DeepSeek-V3` (override via `DeepInfra:Model`) and `response_format: json_object`
 6. Deserialize `choices[0].message.content` into `WorkoutPlanResponse`; the controller maps service exceptions to 503 (missing key) or 502 (API error / unparseable response)
+7. `WorkoutsController.EnrichPlan` maps each returned item back to the catalog drill it came from — by the `drillNumber` the model is asked to echo, else by case-insensitive title — and fills `drillId`, `description`, `minPlayers` and `equipment` (left null when nothing matches)
 
 ### Prompt Design Principle
-The system prompt instructs the model to act as an expert pickleball coach and return only valid JSON. The user prompt includes the player's current and target DUPR (with human-readable labels), total session duration, the numbered drill list, and the exact JSON schema the model must conform to.
+The system prompt instructs the model to act as an expert pickleball coach and return only valid JSON. The user prompt includes the player's current and target DUPR (with human-readable labels), a training-context line for `playersAvailable` (alone / one partner / group / unknown, including the rule that solo coaching notes must not mention a partner), total session duration, the numbered drill list — each line tagged `[Solo]`, `[Partner]` or `[Group]` plus any equipment, with the templated description flattened to one line — and the exact JSON schema the model must conform to (including `drillNumber`).
 
 To modify the workout format, update the prompt built inside `DeepInfraWorkoutLlmService.GeneratePlanAsync` and the corresponding response DTOs (`WorkoutDrillItem`, `WorkoutPlanResponse` in `WorkoutsController.cs`).
 
@@ -173,10 +178,10 @@ File: `src/PickleballGenie.Scraper/Program.cs`
 ### How It Works
 1. Connects to the database and runs any pending EF migrations
 2. Attempts to scrape configured pickleball sites using `HtmlAgilityPack`
-3. Always appends the curated drill list from `PickleballGenie.Data/CuratedDrills.cs` — the single source of truth shared with `DbSeeder`. Curated drills carry pinned GUIDs (`a1000000-...-00NN`); when adding drills, extend the sequence — never renumber or reuse an Id, and keep Titles unique (the scraper dedupes by Title, DbSeeder by Id)
-4. Skips drills whose `Title` already exists in the database (idempotent)
+3. Upserts the curated catalog via `DbSeeder.SeedDrillsAsync` (also run by the API on startup): curated drills carry pinned GUIDs (`a1000000-...-NNN`, currently 1–120) and are the source of truth for their rows — missing ones are inserted, existing ones get Title/Description/Category/level/duration/SourceUrl/MinPlayers/Equipment refreshed (VideoUrl and CreatedAt are kept). When adding drills, extend the sequence past 120 — never renumber, reuse or delete an Id, and keep Titles unique
+4. Skips scraped drills whose `Title` already exists in the database (idempotent); `InferMinPlayers` keyword-guesses the solo/partner/group tag for scraped rows
 
-Drill seeding is handled only by the Scraper — not via EF seed data or migrations.
+Curated drills live in code (`CuratedDrills.cs`, built through the `D(...)` helper so every entry follows the Id scheme and the description template: a one-sentence summary, then `Setup:`, `How to run it:`, `Goal:` and `Coaching cue:` lines). Never seed via EF seed data or migrations, and never hand-edit a pinned-Id row in the database — it is overwritten on the next deploy.
 
 ### DUPR Mapping
 Scraped drills are assigned a DUPR level via keyword heuristics on title + description:

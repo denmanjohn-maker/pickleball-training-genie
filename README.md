@@ -74,7 +74,7 @@ The API starts and automatically runs any pending database migrations.
 
 ## Seeding the Drill Database
 
-The scraper fetches real drills from pickleball websites and falls back to a curated set of drills spanning all DUPR levels (3.0–5.0) and categories. Re-running is idempotent — duplicates are skipped by title.
+The curated catalog (`src/PickleballGenie.Data/CuratedDrills.cs`, 120 drills spanning DUPR 2.0–5.0, every category, and at least eight solo drills per level) is upserted by pinned Id every time the API or the scraper starts, so editing a drill in code updates existing databases on the next deploy. The scraper additionally fetches drills from pickleball websites; re-running it is idempotent — scraped duplicates are skipped by title.
 
 ```bash
 cd src/PickleballGenie.Scraper

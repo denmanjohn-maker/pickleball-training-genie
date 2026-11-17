@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using PickleballGenie.Api.Services;
 using PickleballGenie.Data;
 using PickleballGenie.Models;
 using System.Security.Claims;
@@ -21,9 +22,20 @@ public class DrillsController : ControllerBase
 
     [HttpGet]
     [AllowAnonymous]
-    public async Task<IActionResult> GetDrills([FromQuery] string? category, [FromQuery] decimal? level)
+    public async Task<IActionResult> GetDrills(
+        [FromQuery] string? category,
+        [FromQuery] decimal? level,
+        [FromQuery] int? playersAvailable)
     {
+        if (!PlayersAvailable.IsValid(playersAvailable))
+            return BadRequest(PlayersAvailable.ValidationMessage);
+
         var query = _context.Drills.AsQueryable();
+
+        if (playersAvailable.HasValue)
+        {
+            query = query.Where(d => d.MinPlayers <= playersAvailable.Value);
+        }
 
         if (!string.IsNullOrEmpty(category))
         {
@@ -39,8 +51,11 @@ public class DrillsController : ControllerBase
     }
 
     [HttpGet("recommendations")]
-    public async Task<IActionResult> GetRecommendations()
+    public async Task<IActionResult> GetRecommendations([FromQuery] int? playersAvailable)
     {
+        if (!PlayersAvailable.IsValid(playersAvailable))
+            return BadRequest(PlayersAvailable.ValidationMessage);
+
         var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrEmpty(userIdStr) || !Guid.TryParse(userIdStr, out var userId))
             return Unauthorized();
@@ -57,6 +72,7 @@ public class DrillsController : ControllerBase
         var recommendedDrills = await _context.Drills
             .Where(d => d.TargetDUPRLevel >= user.CurrentDUPR && d.TargetDUPRLevel <= user.TargetDUPR)
             .Where(d => !masteredDrillIds.Contains(d.Id))
+            .Where(d => playersAvailable == null || d.MinPlayers <= playersAvailable)
             .ToListAsync();
 
         return Ok(recommendedDrills);
