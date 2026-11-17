@@ -303,7 +303,7 @@ public class GenerateWorkoutRequest
 
     /// <summary>
     /// Who the player has to train with: 1 = just me, 2 = one partner,
-    /// 4 = a group of 3-4. Null leaves the catalog unfiltered.
+    /// 4 = a group of four. Null leaves the catalog unfiltered.
     /// See <see cref="PlayersAvailable"/>.
     /// </summary>
     public int? PlayersAvailable { get; set; }

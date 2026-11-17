@@ -548,7 +548,7 @@ public class WorkoutsControllerTests
         Assert.IsType<OkObjectResult>(result);
         Assert.Contains("Doubles Lob Rotation", captured);
         Assert.Contains("[Group]", captured);
-        Assert.Contains("GROUP of 3-4", captured);
+        Assert.Contains("GROUP of FOUR", captured);
     }
 
     [Fact]

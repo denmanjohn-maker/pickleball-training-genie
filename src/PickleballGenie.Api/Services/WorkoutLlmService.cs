@@ -63,7 +63,7 @@ public class DeepInfraWorkoutLlmService : IWorkoutLlmService
             PlayersAvailable.Partner =>
                 "Training context: the player has ONE partner. Use [Solo] or [Partner] drills; never a [Group] drill. Where a drill has the partner feeding, say so and suggest swapping roles.",
             PlayersAvailable.Group =>
-                "Training context: the player has a GROUP of 3-4. Prefer [Group] doubles-pattern drills where they fit and use [Partner] drills for the rest, with notes that keep everyone active (rotate feeders, run two pairs).",
+                "Training context: the player has a GROUP of FOUR. Prefer [Group] doubles-pattern drills where they fit and use [Partner] drills for the rest, with notes that keep everyone active (rotate feeders, run two pairs).",
             _ =>
                 "Training context: unknown. Prefer drills that work with one partner."
         };

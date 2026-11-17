@@ -15,7 +15,7 @@ public static class PlayersAvailable
     public const int Group = 4;
 
     public const string ValidationMessage =
-        "playersAvailable must be 1 (just me), 2 (with a partner) or 4 (group of 3-4).";
+        "playersAvailable must be 1 (just me), 2 (with a partner) or 4 (group of four).";
 
     public static bool IsValid(int? value) => value is null or Solo or Partner or Group;
 
